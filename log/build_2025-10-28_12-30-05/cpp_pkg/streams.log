@@ -1,8 +1,0 @@
-[0.008s] Invoking command in '/home/student/nrs_lv_ws/build/cpp_pkg': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/student/nrs_lv_ws/install/py_pkg:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/student/nrs_lv_ws/build/cpp_pkg -- -j16 -l16
-[0.025s] [31mCMake Error at CMakeLists.txt:15:
-[0.025s]   Parse error.  Expected "(", got identifier with text "TARGETS".
-[0.025s] 
-[0.025s] [0m
-[0.025s] -- Configuring incomplete, errors occurred!
-[0.026s] gmake: *** [Makefile:226: cmake_check_build_system] Error 1
-[0.139s] Invoked command in '/home/student/nrs_lv_ws/build/cpp_pkg' returned '2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/student/nrs_lv_ws/install/py_pkg:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/student/nrs_lv_ws/build/cpp_pkg -- -j16 -l16

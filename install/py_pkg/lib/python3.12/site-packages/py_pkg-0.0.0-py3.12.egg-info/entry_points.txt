@@ -1,4 +1,0 @@
-[console_scripts]
-complex_pub = py_pkg.complex_pub:main
-complex_sub = py_pkg.complex_sub:main
-my_node = py_pkg.myNode:main

@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="bob_ros">
+    <xacro:include filename="bob_ros_model_urdf.xacro"/>
+    <xacro:include filename="bob_ros_gz_urdf.xacro"/>
+
+    <xacro:bob_ros/>
+</robot>
