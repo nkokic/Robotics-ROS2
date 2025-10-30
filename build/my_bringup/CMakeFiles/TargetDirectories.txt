@@ -1,0 +1,9 @@
+/home/student/nrs_lv_ws/build/my_bringup/CMakeFiles/uninstall.dir
+/home/student/nrs_lv_ws/build/my_bringup/CMakeFiles/my_bringup_uninstall.dir
+/home/student/nrs_lv_ws/build/my_bringup/CMakeFiles/test.dir
+/home/student/nrs_lv_ws/build/my_bringup/CMakeFiles/edit_cache.dir
+/home/student/nrs_lv_ws/build/my_bringup/CMakeFiles/rebuild_cache.dir
+/home/student/nrs_lv_ws/build/my_bringup/CMakeFiles/list_install_components.dir
+/home/student/nrs_lv_ws/build/my_bringup/CMakeFiles/install.dir
+/home/student/nrs_lv_ws/build/my_bringup/CMakeFiles/install/local.dir
+/home/student/nrs_lv_ws/build/my_bringup/CMakeFiles/install/strip.dir

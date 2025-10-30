@@ -1,0 +1,25 @@
+[0.008s] Invoking command in '/home/student/nrs_lv_ws/build/cpp_pkg': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/student/nrs_lv_ws/install/py_pkg:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/student/nrs_lv_ws/build/cpp_pkg -- -j16 -l16
+[0.049s] [ 50%] [32mBuilding CXX object CMakeFiles/mynodecpp.dir/src/my_2node.cpp.o[0m
+[1.770s] [100%] [32m[1mLinking CXX executable mynodecpp[0m
+[1.889s] [100%] Built target mynodecpp
+[1.896s] Invoked command in '/home/student/nrs_lv_ws/build/cpp_pkg' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/student/nrs_lv_ws/install/py_pkg:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/student/nrs_lv_ws/build/cpp_pkg -- -j16 -l16
+[1.910s] Invoking command in '/home/student/nrs_lv_ws/build/cpp_pkg': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/student/nrs_lv_ws/install/py_pkg:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/student/nrs_lv_ws/build/cpp_pkg
+[1.921s] -- Install configuration: ""
+[1.921s] -- Installing: /home/student/nrs_lv_ws/install/cpp_pkg/lib/cpp_pkg/mynodecpp
+[1.921s] -- Set non-toolchain portion of runtime path of "/home/student/nrs_lv_ws/install/cpp_pkg/lib/cpp_pkg/mynodecpp" to ""
+[1.921s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/ament_index/resource_index/package_run_dependencies/cpp_pkg
+[1.921s] -- Installing: /home/student/nrs_lv_ws/install/cpp_pkg/share/ament_index/resource_index/parent_prefix_path/cpp_pkg
+[1.921s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/cpp_pkg/environment/ament_prefix_path.sh
+[1.921s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/cpp_pkg/environment/ament_prefix_path.dsv
+[1.921s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/cpp_pkg/environment/path.sh
+[1.921s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/cpp_pkg/environment/path.dsv
+[1.921s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/cpp_pkg/local_setup.bash
+[1.922s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/cpp_pkg/local_setup.sh
+[1.922s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/cpp_pkg/local_setup.zsh
+[1.922s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/cpp_pkg/local_setup.dsv
+[1.922s] -- Installing: /home/student/nrs_lv_ws/install/cpp_pkg/share/cpp_pkg/package.dsv
+[1.922s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/ament_index/resource_index/packages/cpp_pkg
+[1.922s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/cpp_pkg/cmake/cpp_pkgConfig.cmake
+[1.922s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/cpp_pkg/cmake/cpp_pkgConfig-version.cmake
+[1.922s] -- Up-to-date: /home/student/nrs_lv_ws/install/cpp_pkg/share/cpp_pkg/package.xml
+[1.923s] Invoked command in '/home/student/nrs_lv_ws/build/cpp_pkg' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/student/nrs_lv_ws/install/py_pkg:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/student/nrs_lv_ws/build/cpp_pkg

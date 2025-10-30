@@ -1,0 +1,6 @@
+[31mCMake Error at CMakeLists.txt:15:
+  Parse error.  Expected "(", got identifier with text "TARGETS".
+
+[0m
+-- Configuring incomplete, errors occurred!
+gmake: *** [Makefile:226: cmake_check_build_system] Error 1

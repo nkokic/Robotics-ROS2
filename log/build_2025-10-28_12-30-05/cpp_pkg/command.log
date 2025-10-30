@@ -1,0 +1,2 @@
+Invoking command in '/home/student/nrs_lv_ws/build/cpp_pkg': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/student/nrs_lv_ws/install/py_pkg:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/student/nrs_lv_ws/build/cpp_pkg -- -j16 -l16
+Invoked command in '/home/student/nrs_lv_ws/build/cpp_pkg' returned '2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/student/nrs_lv_ws/install/py_pkg:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/student/nrs_lv_ws/build/cpp_pkg -- -j16 -l16

@@ -1,0 +1,26 @@
+[0.442s] Invoking command in '/home/student/nrs_lv_ws/src/py_pkg': AMENT_PREFIX_PATH=/home/student/nrs_lv_ws/install/my_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/student/nrs_lv_ws/install/my_interfaces:${CMAKE_PREFIX_PATH} DEBUGINFOD_URLS=https://debuginfod.ubuntu.com LD_LIBRARY_PATH=/home/student/nrs_lv_ws/install/my_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/student/nrs_lv_ws/build/py_pkg/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/student/nrs_lv_ws/install/py_pkg/lib/python3.12/site-packages:/home/student/nrs_lv_ws/install/my_interfaces/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/py_pkg build --build-base /home/student/nrs_lv_ws/build/py_pkg/build install --record /home/student/nrs_lv_ws/build/py_pkg/install.log --single-version-externally-managed install_data
+[0.585s] running egg_info
+[0.595s] writing ../../build/py_pkg/py_pkg.egg-info/PKG-INFO
+[0.595s] writing dependency_links to ../../build/py_pkg/py_pkg.egg-info/dependency_links.txt
+[0.595s] writing entry points to ../../build/py_pkg/py_pkg.egg-info/entry_points.txt
+[0.595s] writing requirements to ../../build/py_pkg/py_pkg.egg-info/requires.txt
+[0.595s] writing top-level names to ../../build/py_pkg/py_pkg.egg-info/top_level.txt
+[0.615s] reading manifest file '../../build/py_pkg/py_pkg.egg-info/SOURCES.txt'
+[0.615s] writing manifest file '../../build/py_pkg/py_pkg.egg-info/SOURCES.txt'
+[0.615s] running build
+[0.615s] running build_py
+[0.615s] copying py_pkg/complex_pub.py -> /home/student/nrs_lv_ws/build/py_pkg/build/lib/py_pkg
+[0.615s] running install
+[0.619s] running install_lib
+[0.629s] copying /home/student/nrs_lv_ws/build/py_pkg/build/lib/py_pkg/complex_pub.py -> /home/student/nrs_lv_ws/install/py_pkg/lib/python3.12/site-packages/py_pkg
+[0.629s] byte-compiling /home/student/nrs_lv_ws/install/py_pkg/lib/python3.12/site-packages/py_pkg/complex_pub.py to complex_pub.cpython-312.pyc
+[0.629s] running install_data
+[0.629s] copying package.xml -> /home/student/nrs_lv_ws/install/py_pkg/share/py_pkg
+[0.629s] running install_egg_info
+[0.640s] removing '/home/student/nrs_lv_ws/install/py_pkg/lib/python3.12/site-packages/py_pkg-0.0.0-py3.12.egg-info' (and everything under it)
+[0.640s] Copying ../../build/py_pkg/py_pkg.egg-info to /home/student/nrs_lv_ws/install/py_pkg/lib/python3.12/site-packages/py_pkg-0.0.0-py3.12.egg-info
+[0.640s] running install_scripts
+[0.709s] Installing complex_pub script to /home/student/nrs_lv_ws/install/py_pkg/lib/py_pkg
+[0.709s] Installing my_node script to /home/student/nrs_lv_ws/install/py_pkg/lib/py_pkg
+[0.709s] writing list of installed files to '/home/student/nrs_lv_ws/build/py_pkg/install.log'
+[0.724s] Invoked command in '/home/student/nrs_lv_ws/src/py_pkg' returned '0': AMENT_PREFIX_PATH=/home/student/nrs_lv_ws/install/my_interfaces:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/student/nrs_lv_ws/install/my_interfaces:${CMAKE_PREFIX_PATH} DEBUGINFOD_URLS=https://debuginfod.ubuntu.com LD_LIBRARY_PATH=/home/student/nrs_lv_ws/install/my_interfaces/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/student/nrs_lv_ws/build/py_pkg/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/student/nrs_lv_ws/install/py_pkg/lib/python3.12/site-packages:/home/student/nrs_lv_ws/install/my_interfaces/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/py_pkg build --build-base /home/student/nrs_lv_ws/build/py_pkg/build install --record /home/student/nrs_lv_ws/build/py_pkg/install.log --single-version-externally-managed install_data

@@ -1,0 +1,25 @@
+[0.008s] Invoking command in '/home/student/nrs_lv_ws/build/cpp_pkg': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/student/nrs_lv_ws/install/py_pkg:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/student/nrs_lv_ws/build/cpp_pkg -- -j16 -l16
+[0.027s] -- Found ament_cmake: 2.5.4 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[0.171s] -- Found rclcpp: 28.1.12 (/opt/ros/jazzy/share/rclcpp/cmake)
+[0.187s] -- Found rosidl_generator_c: 4.6.6 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[0.192s] -- Found rosidl_generator_cpp: 4.6.6 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[0.198s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.206s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.242s] -- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[0.243s] -- Found rmw_fastrtps_cpp: 8.4.3 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[0.288s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[0.326s] [31mCMake Error at CMakeLists.txt:15 (install):
+[0.327s]   Syntax error in cmake code at
+[0.327s] 
+[0.327s]     /home/student/nrs_lv_ws/src/cpp_pkg/CMakeLists.txt:17
+[0.327s] 
+[0.327s]   when parsing string
+[0.327s] 
+[0.327s]     lib/${PROJECT
+[0.327s] 
+[0.327s]   There is an unterminated variable reference.
+[0.327s] 
+[0.327s] [0m
+[0.327s] -- Configuring incomplete, errors occurred!
+[0.330s] gmake: *** [Makefile:226: cmake_check_build_system] Error 1
+[0.332s] Invoked command in '/home/student/nrs_lv_ws/build/cpp_pkg' returned '2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/student/nrs_lv_ws/install/py_pkg:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/student/nrs_lv_ws/build/cpp_pkg -- -j16 -l16

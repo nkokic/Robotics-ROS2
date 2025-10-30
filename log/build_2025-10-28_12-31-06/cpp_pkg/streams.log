@@ -1,0 +1,44 @@
+[0.008s] Invoking command in '/home/student/nrs_lv_ws/build/cpp_pkg': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/student/nrs_lv_ws/install/py_pkg:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/student/nrs_lv_ws/build/cpp_pkg -- -j16 -l16
+[0.027s] -- Found ament_cmake: 2.5.4 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[0.184s] -- Found rclcpp: 28.1.12 (/opt/ros/jazzy/share/rclcpp/cmake)
+[0.200s] -- Found rosidl_generator_c: 4.6.6 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[0.205s] -- Found rosidl_generator_cpp: 4.6.6 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[0.212s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.219s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.256s] -- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[0.257s] -- Found rmw_fastrtps_cpp: 8.4.3 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[0.304s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[0.394s] -- Configuring done (0.4s)
+[0.400s] -- Generating done (0.0s)
+[0.402s] -- Build files have been written to: /home/student/nrs_lv_ws/build/cpp_pkg
+[0.430s] [ 50%] [32mBuilding CXX object CMakeFiles/mynodecpp.dir/src/my_2node.cpp.o[0m
+[0.442s] [01m[K/home/student/nrs_lv_ws/src/cpp_pkg/src/my_2node.cpp:1:1:[m[K [01;31m[Kerror: [m[K‘[01m[Kinclude[m[K’ does not name a type
+[0.442s]     1 | [01;31m[Kinclude[m[K "rclcpp/rclcpp.hpp"
+[0.442s]       | [01;31m[K^~~~~~~[m[K
+[0.443s] [01m[K/home/student/nrs_lv_ws/src/cpp_pkg/src/my_2node.cpp:[m[K In function ‘[01m[Kint[01;32m[K main[m[K(int, char**)[m[K’:
+[0.443s] [01m[K/home/student/nrs_lv_ws/src/cpp_pkg/src/my_2node.cpp:22:5:[m[K [01;31m[Kerror: [m[K‘[01m[Krclcpp[m[K’ has not been declared
+[0.443s]    22 |     [01;31m[Krclcpp[m[K::init(argc, argv);
+[0.443s]       |     [01;31m[K^~~~~~[m[K
+[0.443s] [01m[K/home/student/nrs_lv_ws/src/cpp_pkg/src/my_2node.cpp:23:22:[m[K [01;31m[Kerror: [m[K‘[01m[Kmake_shared[m[K’ is not a member of ‘[01m[Kstd[m[K’
+[0.443s]    23 |     auto node = std::[01;31m[Kmake_shared[m[K<MyNode>();
+[0.443s]       |                      [01;31m[K^~~~~~~~~~~[m[K
+[0.444s] [01m[K/home/student/nrs_lv_ws/src/cpp_pkg/src/my_2node.cpp:1:1:[m[K [01;36m[Knote: [m[K‘[01m[Kstd::make_shared[m[K’ is defined in header ‘[01m[K<memory>[m[K’; did you forget to ‘[01m[K#include <memory>[m[K’?
+[0.444s]   +++ |+[32m[K#include <memory>[m[K
+[0.444s]     1 | include "rclcpp/rclcpp.hpp"
+[0.445s] [01m[K/home/student/nrs_lv_ws/src/cpp_pkg/src/my_2node.cpp:23:34:[m[K [01;31m[Kerror: [m[K‘[01m[KMyNode[m[K’ was not declared in this scope; did you mean ‘[01m[Knode[m[K’?
+[0.445s]    23 |     auto node = std::make_shared<[01;31m[KMyNode[m[K>();
+[0.445s]       |                                  [01;31m[K^~~~~~[m[K
+[0.445s]       |                                  [32m[Knode[m[K
+[0.445s] [01m[K/home/student/nrs_lv_ws/src/cpp_pkg/src/my_2node.cpp:23:42:[m[K [01;31m[Kerror: [m[Kexpected primary-expression before ‘[01m[K)[m[K’ token
+[0.445s]    23 |     auto node = std::make_shared<MyNode>([01;31m[K)[m[K;
+[0.445s]       |                                          [01;31m[K^[m[K
+[0.445s] [01m[K/home/student/nrs_lv_ws/src/cpp_pkg/src/my_2node.cpp:24:5:[m[K [01;31m[Kerror: [m[K‘[01m[Krclcpp[m[K’ has not been declared
+[0.446s]    24 |     [01;31m[Krclcpp[m[K::spin(node);
+[0.446s]       |     [01;31m[K^~~~~~[m[K
+[0.446s] [01m[K/home/student/nrs_lv_ws/src/cpp_pkg/src/my_2node.cpp:25:5:[m[K [01;31m[Kerror: [m[K‘[01m[Krclcpp[m[K’ has not been declared
+[0.446s]    25 |     [01;31m[Krclcpp[m[K::shutdown();
+[0.446s]       |     [01;31m[K^~~~~~[m[K
+[0.446s] gmake[2]: *** [CMakeFiles/mynodecpp.dir/build.make:76: CMakeFiles/mynodecpp.dir/src/my_2node.cpp.o] Error 1
+[0.446s] gmake[1]: *** [CMakeFiles/Makefile2:137: CMakeFiles/mynodecpp.dir/all] Error 2
+[0.446s] gmake: *** [Makefile:146: all] Error 2
+[0.448s] Invoked command in '/home/student/nrs_lv_ws/build/cpp_pkg' returned '2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/student/nrs_lv_ws/install/py_pkg:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/student/nrs_lv_ws/build/cpp_pkg -- -j16 -l16
