@@ -1,0 +1,11 @@
+<launch>
+    <let name="urdf_path" 
+    value="$(find-pkg-share robot_description)/urdf/bob_ros_urdf.xacro"/>
+
+    node robot state publisher
+
+    let urdf path
+    let world path
+    let gazebo_config_path
+    
+</launch>
