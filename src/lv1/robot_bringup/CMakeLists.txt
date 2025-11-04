@@ -10,7 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 
 install(DIRECTORY
-urdf
+config launch worlds maps
 DESTINATION share/${PROJECT_NAME}
 )
 

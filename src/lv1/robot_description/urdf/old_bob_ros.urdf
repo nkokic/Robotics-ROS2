@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 
-<robot name="mob_rob">
+<robot name="robot">
     <link name= "base_link">
         <visual>
             <geometry>
