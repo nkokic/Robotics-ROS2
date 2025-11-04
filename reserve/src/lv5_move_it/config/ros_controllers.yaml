@@ -1,0 +1,46 @@
+arm_controller:
+  type: position_controllers/JointTrajectoryController
+  joints:
+    - hip
+    - shoulder
+    - elbow
+    - elbow_2
+    - elbow_3
+    - elbow_4
+    - wrist
+  gains:
+    hip:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
+    shoulder:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
+    elbow:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
+    elbow_2:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
+    elbow_3:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
+    elbow_4:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1
+    wrist:
+      p: 100
+      d: 1
+      i: 1
+      i_clamp: 1

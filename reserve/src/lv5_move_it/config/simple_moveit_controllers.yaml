@@ -1,0 +1,13 @@
+controller_list:
+  - name: arm_controller
+    action_ns: follow_joint_trajectory
+    type: FollowJointTrajectory
+    default: True
+    joints:
+      - hip
+      - shoulder
+      - elbow
+      - elbow_2
+      - elbow_3
+      - elbow_4
+      - wrist
