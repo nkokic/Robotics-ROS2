@@ -1,22 +1,16 @@
 <launch>
     <let name="urdf_path"
-    value="$(find-pkg-share robot_description)/urdf/bob_ros_urdf.xacro" />
-
-    <let name="gazebo_config_path"
-    value="$(find-pkg-share robot_bringup)/config/gz_bridge.yaml" />
-
-    <let name="gazebo_world_path"
-    value="$(find-pkg-share robot_bringup)/worlds/depot.sdf" />
-
-    <let name="map_path"
-    value="$(find-pkg-share robot_bringup)/maps/depot.yaml" />
-
-    <let name="nav2_config_path"
-    value="$(find-pkg-share robot_bringup)/config/nav2_params_simple.yaml" />
-
+        value="$(find-pkg-share robot_description)/urdf/bob_ros_urdf.xacro" />
+    <let name="gazebo_config_path" 
+         value="$(find-pkg-share robot_bringup)/config/gz_bridge.yaml" />
+    <let name="gazebo_world_path" 
+         value="$(find-pkg-share robot_bringup)/world/depot.sdf" />
+    <let name="map_path" 
+         value="$(find-pkg-share robot_bringup)/maps/depot.yaml" />
+    <let name="nav2_config_path" 
+         value="$(find-pkg-share robot_bringup)/config/nav2_params_2.yaml" />
     <let name="rviz_config_path"
-    value="$(find-pkg-share robot_bringup)/config/navigation.rviz" />
-
+         value="$(find-pkg-share robot_bringup)/config/navigation.rviz" />
 
     <node pkg="robot_state_publisher" exec="robot_state_publisher">
         <param name="robot_description" value="$(command 'xacro $(var urdf_path)')" />
@@ -25,6 +19,8 @@
     <node pkg="nav2_map_server" exec="map_server" name="map_server" respawn="True" respawn_delay="2.0">
         <param from="$(var nav2_config_path)" />
         <param name="yaml_filename" value="$(var map_path)" />
+        <remap from="/tf" to="tf" />
+        <remap from="/tf_static" to="tf_static" />
     </node>
 
     <node pkg="nav2_amcl" exec="amcl" name="amcl" respawn="True" respawn_delay="2.0">
@@ -35,47 +31,41 @@
         <param from="$(var nav2_config_path)" />
     </node>
 
-    <node pkg="nav2_smoother" exec="smoother_server" name="smoother_server" respawn="True"
-    respawn_delay="2.0">
+    <node pkg="nav2_smoother" exec="smoother_server" name="smoother_server" respawn="True" respawn_delay="2.0">
+        <param from="$(var nav2_config_path)" />
+   </node>
+
+    <node pkg="nav2_planner" exec="planner_server" name="planner_server" respawn="True" respawn_delay="2.0">
+        <param from="$(var nav2_config_path)" />
+    </node> 
+
+    <node pkg="nav2_bt_navigator" exec="bt_navigator" name="bt_navigator" respawn="True" respawn_delay="2.0">
         <param from="$(var nav2_config_path)" />
     </node>
 
-    <node pkg="nav2_planner" exec="planner_server" name="planner_server" respawn="True"
-    respawn_delay="2.0">
+    <node pkg="nav2_velocity_smoother" exec="velocity_smoother" name="velocity_smoother" respawn="True" respawn_delay="2.0">
         <param from="$(var nav2_config_path)" />
     </node>
 
-    <node pkg="nav2_bt_navigator" exec="bt_navigator" name="bt_navigator" respawn="True"
-    respawn_delay="2.0">
+    <node pkg="nav2_behaviors" exec="behavior_server" name="behavior_server" respawn="True" respawn_delay="2.0">
         <param from="$(var nav2_config_path)" />
     </node>
 
-    <node pkg="nav2_velocity_smoother" exec="velocity_smoother" name="velocity_smoother" respawn="True"
-    respawn_delay="2.0">
+    <node pkg="nav2_lifecycle_manager" exec="lifecycle_manager" name="lifecycle_manager" respawn="True" respawn_delay="2.0">
         <param from="$(var nav2_config_path)" />
-    </node>
-
-    <node pkg="nav2_behaviors" exec="behavior_server" name="behavior_server" respawn="True"
-    respawn_delay="2.0">
-        <param from="$(var nav2_config_path)" />
-    </node>
-
-    <node pkg="nav2_lifecycle_manager" exec="lifecycle_manager" name="lifecycle_manager" respawn="True"
-    respawn_delay="2.0">
-        <param from="$(var nav2_config_path)" />
-    </node>
+    </node> 
 
     <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py">
         <arg name="gz_args" value="$(var gazebo_world_path) -r" />
     </include>
 
-    <node pkg="ros_gz_sim" exec="create" args="-topic robot_description -x -8.00 -y 0.00 -z 0.2 -R 0.00 -P 0.00 -Y 0.00">
+    <node pkg="ros_gz_sim" exec="create" args="-topic robot_description -x -8.00 -y 0.00 -z 0.26 -R 0.00 -P 0.00 -Y 0.00">
         <param name="use_sim_time" value="True" />
-    </node>
+    </node> 
 
     <node pkg="ros_gz_bridge" exec="parameter_bridge">
         <param name="config_file" value="$(var gazebo_config_path)" />
-    </node>
+    </node> 
 
-    <node pkg="rviz2" exec="rviz2" args="-d $(var rviz_config_path)" />
+   <node pkg="rviz2" exec="rviz2" args="-d $(var rviz_config_path)" />
 </launch>
