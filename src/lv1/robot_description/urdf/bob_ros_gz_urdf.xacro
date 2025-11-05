@@ -9,15 +9,35 @@
         </gazebo>
         <gazebo reference="front_left_wheel">
             <material>Gazebo/Black</material>
+            <mu1 value="1.0"/>
+            <mu2 value="0.25"/>
+            <kp value="10000000.0" />
+            <kd value="1.0" />
+            <fdir1 value="1 0 0"/>
         </gazebo>
         <gazebo reference="front_right_wheel">
             <material>Gazebo/Black</material>
+            <mu1 value="1.0"/>
+            <mu2 value="0.25"/>
+            <kp value="10000000.0" />
+            <kd value="1.0" />
+            <fdir1 value="1 0 0"/>
         </gazebo>
         <gazebo reference="back_left_wheel">
             <material>Gazebo/Black</material>
+            <mu1 value="1.0"/>
+            <mu2 value="0.25"/>
+            <kp value="10000000.0" />
+            <kd value="1.0" />
+            <fdir1 value="1 0 0"/>
         </gazebo>
         <gazebo reference="back_right_wheel">
             <material>Gazebo/Black</material>
+            <mu1 value="1.0"/>
+            <mu2 value="0.25"/>
+            <kp value="10000000.0" />
+            <kd value="1.0" />
+            <fdir1 value="1 0 0"/>
         </gazebo>
         <gazebo reference="lidar_link">
             <material>Gazebo/Black</material>
