@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="bob_manip">
+    <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
+
+    <!-- Import bob_manip urdf file -->
+    <xacro:include filename="$(find rob_manip_description)/urdf/bob_manip.urdf" />
+
+    <!-- Import control_xacro -->
+    <xacro:include filename="bob_manip.ros2_control.xacro" />
+
+
+    <xacro:bob_manip_ros2_control name="GazeboSimSystem" initial_positions_file="$(arg initial_positions_file)"/>
+
+</robot>

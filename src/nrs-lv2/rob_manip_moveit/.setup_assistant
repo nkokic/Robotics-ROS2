@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: rob_manip_description
+    relative_path: urdf/bob_manip.urdf
+  srdf:
+    relative_path: config/bob_manip.srdf
+  package_settings:
+    author_name: nkokic
+    author_email: nikola1.kokic@gmail.com
+    generated_timestamp: 1762349489
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity

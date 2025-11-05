@@ -1,0 +1,32 @@
+<launch>
+    <let name="urdf_path"
+    value="$(find-pkg-share rob_manip_description)/urdf/bob_manip.urdf" />
+
+    <let name="gazebo_config_path"
+    value="$(find-pkg-share rob_manip_bringup)/config/gz_bridge.yaml" />
+
+    <let name="robot_controllers_path"
+    value="$(find-pkg-share rob_manip_moveit)/config/ros2_controllers.yaml" />
+
+    <let name="moveit_controllers_path"
+    value="$(find-pkg-share rob_manip_moveit)/config/moveit_controllers.yaml" />
+
+    <include file="$(find-pkg-share rob_manip_moveit)/launch/rsp.launch.py"/>
+
+    <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py">
+        <arg name="gz_args" value="empty.sdf -r" />
+    </include>
+
+    <node pkg="ros_gz_sim" exec="create" args="-topic robot_description" />
+
+    <node pkg="ros_gz_bridge" exec="parameter_bridge">
+        <param name="config_file" value="$(var gazebo_config_path)" />
+    </node>
+
+    <include file="$(find-pkg-share rob_manip_moveit)/launch/move_group_sim.launch.py"/>
+
+    <include file="$(find-pkg-share rob_manip_moveit)/launch/moveit_rviz.launch.py"/>
+
+    <node pkg="controller_manager" exec="spawner" args="joint_state_broadcaster"/>
+    <node pkg="controller_manager" exec="spawner" args="arm_controller --param-file $(var robot_controllers_path)"/>
+</launch>

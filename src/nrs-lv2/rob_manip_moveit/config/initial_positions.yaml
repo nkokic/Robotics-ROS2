@@ -1,0 +1,10 @@
+# Default initial positions for bob_manip's ros2_control fake system
+
+initial_positions:
+  elbow: 0
+  elbow_2: 0
+  elbow_3: 0
+  elbow_4: 0
+  hip: 0
+  shoulder: 0
+  wrist: 0
