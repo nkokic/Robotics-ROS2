@@ -49,9 +49,6 @@ def main():
     moveit2.max_acceleration = 0.5
 
     # Parameters
-    position = [0.38, 0.0, 0.2]
-    q = quaternion_from_euler(0.0, 3.14, 0.0)
-    quat_xyzw = [q[0], q[1], q[2], q[3]]
     cartesian = False
     cartesian_max_step = 0.0025
     cartesian_fraction_threshold = 0.0
@@ -62,20 +59,34 @@ def main():
     moveit2.cartesian_avoid_collisions = cartesian_avoid_collisions
     moveit2.cartesian_jump_threshold = cartesian_jump_threshold
 
-    # Move to pose
-    node.get_logger().info(f"Moving to {{position: {list(position)}, quat_xyzw: {list(quat_xyzw)}}}")
-    moveit2.move_to_pose(
-        position=position,
-        quat_xyzw=quat_xyzw,
-        cartesian=cartesian,
-        cartesian_max_step=cartesian_max_step,
-        cartesian_fraction_threshold=cartesian_fraction_threshold,)
+    def moveToPose(position, rotation):
+        # Move to pose
+        q = rotation
+        for i in range(len(q)):
+            q[i] = q[i] / 180 * 3.14
+        q = quaternion_from_euler(q[0], q[1], q[2])
+        node.get_logger().info("Radians: " + str(rotation))
+        quat_xyzw = [q[0], q[1], q[2], q[3]]
+        node.get_logger().info(f"Moving to {{position: {list(position)}, quat_xyzw: {list(quat_xyzw)}}}")
+        moveit2.move_to_pose(
+            position=position,
+            quat_xyzw=quat_xyzw,
+            cartesian=cartesian,
+            cartesian_max_step=cartesian_max_step,
+            cartesian_fraction_threshold=cartesian_fraction_threshold,)
 
-    moveit2.wait_until_executed()
+        moveit2.wait_until_executed()
+        print("Path executed.")
+        #Start Second move command
+        a = input("Press any key to continue.")
+    
+    #                        x    y    z                x   y   z
+    moveToPose(position = [0.38, 0.0, 0.2], rotation = [0, 180, 0])
+    moveToPose(position = [0.33, 0.0, 0.3], rotation = [0, 180, 0])
+    moveToPose(position = [0, 0.38, 0.2], rotation = [0, 180, 0])
+    moveToPose(position = [0, 0.33, 0.3], rotation = [0, 180, 0])
 
-    #Start Second move command
-    a = input("Press any key")
-    new_joint_states = [0.0, 0.0, math.pi / 2, 0.0, 0.0, 0.0, 0.0]
+    new_joint_states = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     moveit2.move_to_configuration(new_joint_states)
     moveit2.wait_until_executed()
     exit(0)

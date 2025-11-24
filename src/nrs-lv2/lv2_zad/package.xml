@@ -9,6 +9,7 @@
 
   <depend>rclpy</depend>
   <depend>tf2_ros</depend>
+  <depend>moveit</depend>
   <depend>pymoveit2</depend>
 
   <test_depend>ament_copyright</test_depend>

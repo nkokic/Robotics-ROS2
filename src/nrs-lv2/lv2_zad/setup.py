@@ -24,7 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "test_moveit2 = lv2_zad.test_moveit2:main"
+            "test_moveit2 = lv2_zad.test_moveit2:main",
+            "test_moveit = lv2_zad.test_moveit:main"
         ],
     },
 )
