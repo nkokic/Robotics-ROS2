@@ -54,8 +54,9 @@ def MoveIK(mpy, arm, logger, position, orientation_angles):
     pose_goal.pose.position.z = position[2]
 
     orientation = orientation_angles
-    for angle in orientation:
-        angle = angle / 180.0 * math.pi
+    for i in range(len(orientation)):
+        orientation[i] = orientation[i] / 180.0 * math.pi
+
     q = quaternion_from_euler(orientation[0], orientation[1], orientation[2])
 
     pose_goal.pose.orientation.x = q[0]
@@ -74,8 +75,8 @@ def MoveFK(mpy, arm, logger, joint_angles):
 
     joint_radians = joint_angles
 
-    for joint in joint_radians:
-        joint = joint / 180.0 * math.pi
+    for i in range(len(joint_radians)):
+        joint_angles[i] = joint_angles[i] / 180.0 * math.pi
 
     # set constraints message
     # instantiate a RobotState instance using the current robot model
@@ -91,6 +92,8 @@ def MoveFK(mpy, arm, logger, joint_angles):
         "elbow_4": joint_radians[5],
         "wrist": joint_radians[6],
     }
+    robot_state.joint_positions = joint_values
+
     joint_constraint = construct_joint_constraint(
         robot_state=robot_state,
         joint_model_group=robot_model.get_joint_model_group("arm"),
@@ -152,8 +155,18 @@ def main():
         mpy,
         arm,
         logger,
-        position=[0.35, 0.0, 0.2],
+        position=[0.0, 0.35, 0.2],
         orientation_angles=[0.0, 180.0, 0.0]
+    )
+
+    input("Press Enter to continue...")
+
+    MoveIK(
+        mpy,
+        arm,
+        logger,
+        position=[0.2, 0.0, 0.4],
+        orientation_angles=[0.0, 90.0, 0.0]
     )
 
     input("Press Enter to continue...")
