@@ -271,7 +271,7 @@
 
     <gazebo>
         <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-            <parameters>package://rob_manip_moveit/config/ros2_controllers.yaml</parameters>
+            <parameters>/home/student/Robotics-ROS2/src/nrs/lv2/rob_manip_moveit/config/ros2_controllers.yaml</parameters>
         </plugin>
     </gazebo>
 

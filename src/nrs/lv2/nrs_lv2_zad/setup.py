@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'lv2_zad'
+package_name = 'nrs_lv2_zad'
 
 setup(
     name=package_name,
@@ -24,8 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "test_moveit2 = lv2_zad.test_moveit2:main",
-            "test_moveit = lv2_zad.test_moveit:main"
+            "test_moveit2 = nrs_lv2_zad.test_moveit2:main",
+            "test_moveit = nrs_lv2_zad.test_moveit:main"
         ],
     },
 )
