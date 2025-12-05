@@ -12,6 +12,7 @@ from moveit.core.kinematic_constraints import construct_joint_constraint
 # config file libraries
 from moveit_configs_utils import MoveItConfigsBuilder
 from ament_index_python.packages import get_package_share_directory
+import numpy as np
 
 def plan_and_execute(
         robot,
@@ -68,6 +69,19 @@ def MoveIK(mpy, arm, logger, position, orientation_angles):
 
     # plan to goal
     plan_and_execute(mpy, arm, logger)
+
+def InterpolatedMoveIK(mpy, arm, logger, start_pos, end_pos, start_ang, end_ang, steps=10):
+      pos_list = np.linspace(start_pos, end_pos, num=steps)
+      ang_list = np.linspace(start_ang, end_ang, num=steps)
+
+      for i in range(steps):
+            MoveIK(
+                mpy,
+                arm,
+                logger,
+                position=pos_list[i],
+                orientation_angles=ang_list[i]
+            )
 
 def MoveFK(mpy, arm, logger, joint_angles):
     # set plan start state to current state
@@ -133,7 +147,7 @@ def main():
     arm : PlanningComponent = mpy.get_planning_component("arm")
     logger.info("MoveItPy instance created")
 
-    MoveIK(
+    MoveIK(    # Dummy IK movement to catch errors
         mpy,
         arm,
         logger,
@@ -141,7 +155,7 @@ def main():
         orientation_angles=[0.0, 180.0, 0.0]
     )
 
-    MoveIK(
+    MoveIK(    # Dummy IK movement to catch errors
         mpy,
         arm,
         logger,
@@ -149,27 +163,101 @@ def main():
         orientation_angles=[0.0, 180.0, 0.0]
     )
 
-    input("Press Enter to continue...")
-
-    MoveIK(
+    MoveIK( # Root
         mpy,
         arm,
         logger,
-        position=[0.0, 0.35, 0.2],
+        position=[0.2, 0.2, 0.2],
         orientation_angles=[0.0, 180.0, 0.0]
     )
 
-    input("Press Enter to continue...")
+    MoveIK(
+        mpy,
+        arm,
+        logger,
+        position=[0.3, 0.3, 0.2],
+        orientation_angles=[0.0, 180.0, 0.0]
+    )
+
+    MoveIK( # Root
+        mpy,
+        arm,
+        logger,
+        position=[0.2, 0.2, 0.2],
+        orientation_angles=[0.0, 180.0, 0.0]
+    )
 
     MoveIK(
         mpy,
         arm,
         logger,
-        position=[0.2, 0.0, 0.4],
-        orientation_angles=[0.0, 90.0, 0.0]
+        position=[0.3, 0.2, 0.3],
+        orientation_angles=[0.0, 180.0, 0.0]
     )
 
-    input("Press Enter to continue...")
+    MoveIK( # Root
+        mpy,
+        arm,
+        logger,
+        position=[0.2, 0.2, 0.2],
+        orientation_angles=[0.0, 180.0, 0.0]
+    )
+
+    MoveIK(
+        mpy,
+        arm,
+        logger,
+        position=[0.2, 0.3, 0.3],
+        orientation_angles=[0.0, 180.0, 0.0]
+    )
+
+    MoveIK(
+        mpy,
+        arm,
+        logger,
+        position=[0.3, 0.3, 0.2],
+        orientation_angles=[0.0, 180.0, 0.0]
+    )
+
+    MoveIK(
+        mpy,
+        arm,
+        logger,
+        position=[0.3, 0.2, 0.3],
+        orientation_angles=[0.0, 180.0, 0.0]
+    )
+
+    MoveIK(
+        mpy,
+        arm,
+        logger,
+        position=[0.2, 0.3, 0.3],
+        orientation_angles=[0.0, 180.0, 0.0]
+    )
+
+    MoveIK( # Root
+        mpy,
+        arm,
+        logger,
+        position=[0.2, 0.2, 0.2],
+        orientation_angles=[0.0, 180.0, 0.0]
+    )
+
+    MoveIK(
+        mpy,
+        arm,
+        logger,
+        position=[0.3, 0.2, 0.3],
+        orientation_angles=[0.0, 180.0, 0.0]
+    )
+
+    MoveIK( # Root
+        mpy,
+        arm,
+        logger,
+        position=[0.2, 0.2, 0.2],
+        orientation_angles=[0.0, 180.0, 0.0]
+    )
 
     MoveFK(
         mpy,

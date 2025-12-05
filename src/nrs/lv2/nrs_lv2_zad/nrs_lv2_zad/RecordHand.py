@@ -5,6 +5,7 @@ from rclpy.node import Node
 from nav_msgs.msg import Path
 from geometry_msgs.msg import PoseStamped
 from builtin_interfaces.msg import Time
+from tf2_ros import LookupException, ConnectivityException, ExtrapolationException
 
 import tf2_ros
 
@@ -60,7 +61,7 @@ class ArmTrajectoryPublisher(Node):
             # Slanje Path poruke
             self.path_pub.publish(self.path_msg)
 
-        except tf2_ros.TypeException as ex:
+        except (LookupException, ConnectivityException, ExtrapolationException) as ex:
             self.get_logger().warn(f"TF not available: {ex}")
 
 
