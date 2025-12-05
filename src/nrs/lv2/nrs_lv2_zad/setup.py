@@ -24,8 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "test_moveit2 = nrs_lv2_zad.test_moveit2:main",
-            "test_moveit = nrs_lv2_zad.test_moveit:main"
+            "test_moveit = nrs_lv2_zad.test_moveit:main",
+            "RecordHand = nrs_lv2_zad.RecordHand:main",
         ],
     },
 )
