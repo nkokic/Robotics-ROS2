@@ -5,7 +5,7 @@ from rclpy.logging import get_logger
 from geometry_msgs.msg import PoseStamped
 from tf_transformations import quaternion_from_euler
 # moveit_py
-from moveit.planning import MoveItPy
+from moveit.planning import MoveItPy, PlanningComponent
 from moveit.core.robot_state import RobotState
 from moveit.utils import create_params_file_from_dict
 from moveit.core.kinematic_constraints import construct_joint_constraint
@@ -42,6 +42,75 @@ def plan_and_execute(
         else:
                 logger.error("Planning failed")
 
+def MoveIK(mpy, arm, logger, position, orientation_angles):
+    # set plan start state to current state
+    arm.set_start_state_to_current_state()
+
+    # set goal using a pose message this time
+    pose_goal = PoseStamped()
+    pose_goal.header.frame_id = "world"
+    pose_goal.pose.position.x = position[0]
+    pose_goal.pose.position.y = position[1]
+    pose_goal.pose.position.z = position[2]
+
+    orientation = orientation_angles
+    for i in range(len(orientation)):
+        orientation[i] = orientation[i] / 180.0 * math.pi
+
+    q = quaternion_from_euler(orientation[0], orientation[1], orientation[2])
+
+    pose_goal.pose.orientation.x = q[0]
+    pose_goal.pose.orientation.y = q[1]
+    pose_goal.pose.orientation.z = q[2]
+    pose_goal.pose.orientation.w = q[3]
+    
+    arm.set_goal_state(pose_stamped_msg = pose_goal, pose_link = "hand")
+
+    # plan to goal
+    plan_and_execute(mpy, arm, logger)
+
+def MoveFK(mpy, arm, logger, joint_angles):
+    # set plan start state to current state
+    arm.set_start_state_to_current_state()
+
+    joint_radians = joint_angles
+
+    for i in range(len(joint_radians)):
+        joint_angles[i] = joint_angles[i] / 180.0 * math.pi
+
+    # set constraints message
+    # instantiate a RobotState instance using the current robot model
+    robot_model = mpy.get_robot_model()
+    robot_state = RobotState(robot_model)
+
+    joint_values = {
+        "hip": joint_radians[0],
+        "shoulder": joint_radians[1],
+        "elbow": joint_radians[2],
+        "elbow_2": joint_radians[3],
+        "elbow_3": joint_radians[4],
+        "elbow_4": joint_radians[5],
+        "wrist": joint_radians[6],
+    }
+    robot_state.joint_positions = joint_values
+
+    joint_constraint = construct_joint_constraint(
+        robot_state=robot_state,
+        joint_model_group=robot_model.get_joint_model_group("arm"),
+    )
+    arm.set_goal_state(motion_plan_constraints=[joint_constraint])
+
+    # plan to goal
+    logger.info("Planning trajectory")
+    plan_result = arm.plan()
+    if plan_result:
+        logger.info("Executing plan")
+        robot_trajectory = plan_result.trajectory
+        mpy.execute(robot_trajectory, controllers=[])
+    else:
+        logger.error("Planning failed")
+
+
 def main():
     #Define Node configuration
     moveit_config = (
@@ -61,65 +130,53 @@ def main():
 
     # instantiate MoveItPy instance and get planning component
     mpy = MoveItPy(node_name="moveit_py", launch_params_filepaths=[file])
-    arm = mpy.get_planning_component("arm")
+    arm : PlanningComponent = mpy.get_planning_component("arm")
     logger.info("MoveItPy instance created")
 
-    # instantiate a RobotState instance using the current robot model
-    robot_model = mpy.get_robot_model()
-    robot_state = RobotState(robot_model)
-
-    # set plan start state to current state
-    arm.set_start_state_to_current_state()
-
-    # set goal using a pose message this time
-    pose_goal = PoseStamped()
-    pose_goal.header.frame_id = "world"
-    pose_goal.pose.position.x = 0.38
-    pose_goal.pose.position.y = 0.0
-    pose_goal.pose.position.z = 0.2
-    q = quaternion_from_euler(0.0, 3.14, 0.0)
-    pose_goal.pose.orientation.x = q[0]
-    pose_goal.pose.orientation.y = q[1]
-    pose_goal.pose.orientation.z = q[2]
-    pose_goal.pose.orientation.w = q[3]
-    
-    arm.set_goal_state(pose_stamped_msg = pose_goal, pose_link = "hand")
-
-    # plan to goal
-    plan_and_execute(mpy, arm, logger)
-
-    #Start Second move command
-    a = input("Press any key")
-
-    # set plan start state to current state
-    arm.set_start_state_to_current_state()
-
-    # set constraints message
-    joint_values = {
-        "hip": 0.0,
-        "shoulder": 0.0,
-        "elbow": math.pi / 2,
-        "elbow_2": 0.0,
-        "elbow_3": 0.0,
-        "elbow_4": 0.0,
-        "wrist": 0.0,
-    }
-    robot_state.joint_positions = joint_values
-    joint_constraint = construct_joint_constraint(
-        robot_state=robot_state,
-        joint_model_group=robot_model.get_joint_model_group("arm"),
+    MoveIK(
+        mpy,
+        arm,
+        logger,
+        position=[0.35, 0.0, 0.2],
+        orientation_angles=[0.0, 180.0, 0.0]
     )
-    arm.set_goal_state(motion_plan_constraints=[joint_constraint])
 
-    # plan to goal
-    logger.info("Planning trajectory")
-    plan_result = arm.plan()
-    if plan_result:
-        logger.info("Executing plan")
-        robot_trajectory = plan_result.trajectory
-        mpy.execute(robot_trajectory, controllers=[])
-    else:
-        logger.error("Planning failed")
+    MoveIK(
+        mpy,
+        arm,
+        logger,
+        position=[0.35, 0.0, 0.2],
+        orientation_angles=[0.0, 180.0, 0.0]
+    )
+
+    input("Press Enter to continue...")
+
+    MoveIK(
+        mpy,
+        arm,
+        logger,
+        position=[0.0, 0.35, 0.2],
+        orientation_angles=[0.0, 180.0, 0.0]
+    )
+
+    input("Press Enter to continue...")
+
+    MoveIK(
+        mpy,
+        arm,
+        logger,
+        position=[0.2, 0.0, 0.4],
+        orientation_angles=[0.0, 90.0, 0.0]
+    )
+
+    input("Press Enter to continue...")
+
+    MoveFK(
+        mpy,
+        arm,
+        logger,
+        joint_angles=[0.0, 0.0, 90.0, 0.0, 90.0, 0.0, 0.0]
+    )
     exit(0)
 
 if __name__ == '__main__':
