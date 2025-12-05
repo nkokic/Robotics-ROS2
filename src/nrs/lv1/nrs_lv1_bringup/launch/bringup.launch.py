@@ -1,7 +1,9 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import ExecuteProcess
+from launch.actions import TimerAction
 import os
+import shutil
 
 def generate_launch_description():
     pkg_share = os.path.join(
@@ -11,6 +13,7 @@ def generate_launch_description():
     bag_dir = os.path.join(pkg_share, 'bag')
 
     # Provjeri da direktorij postoji
+    shutil.rmtree(bag_dir, ignore_errors=True)
     os.makedirs(bag_dir, exist_ok=True)
 
     return LaunchDescription([
@@ -56,7 +59,7 @@ def generate_launch_description():
             cmd=[
                 'ros2', 'bag', 'record',
                 '-o', os.path.join(bag_dir, 'bagfile'),
-                '/znamenitost',
+                '/znamenitosti',
                 '/turtle1/pose'
             ],
             shell=False

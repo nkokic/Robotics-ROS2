@@ -3,13 +3,13 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 import time
 import math
-from geometry_msgs.msg import Pose2D
 
 class TwistPublisher(Node):
 
     def __init__(self):
         super().__init__('minimal_publisher')
         self.publisher_ = self.create_publisher(Twist, '/turtle1/cmd_vel', 10)
+        time.sleep(1)
         self.start_time = time.time()
         self.timer_period = 0.01  # seconds
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
@@ -45,7 +45,6 @@ class TwistPublisher(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    time.sleep(0.5)
     pub = TwistPublisher()
 
     rclpy.spin(pub)

@@ -25,7 +25,8 @@ setup(
     entry_points={
         'console_scripts': [
             'turtleControl = nrs_lv1.TurtleControl:main',
-            'znamenitostiNode = nrs_lv1.TurtlePub:main'
+            'znamenitostiNode = nrs_lv1.TurtlePub:main',
+            'showHistory = nrs_lv1.ShowHistory:main',
         ],
     },
 )

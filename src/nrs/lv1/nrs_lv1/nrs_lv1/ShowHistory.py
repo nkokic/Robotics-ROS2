@@ -1,6 +1,7 @@
 import os
 import matplotlib.pyplot as plt
 
+from ament_index_python.packages import get_package_share_path
 from rclpy.serialization import deserialize_message
 from turtlesim.msg import Pose as TurtlePose
 from nrs_lv1_interfaces.msg import Znamenitost
@@ -8,10 +9,12 @@ from rosbag2_py import SequentialReader, StorageOptions, ConverterOptions
 
 def main():
     # Putanja do bag datoteke
-    bag_path = os.path.expanduser('~/ros2_ws/src/lv1_bringup/bag/bagfile_0')  # promijeni prema lokaciji
+    # '/home/student/Robotics-ROS2/install/nrs_lv1_bringup/share/nrs_lv1_bringup/bag/bagfile/bagfile_0.mcap'
+    pkg_share = get_package_share_path('nrs_lv1_bringup')
+    bag_path = os.path.join(pkg_share, 'bag', 'bagfile', 'bagfile_0.mcap')
 
     # Inicijalizacija bag reader-a
-    storage_options = StorageOptions(uri=bag_path, storage_id='sqlite3')
+    storage_options = StorageOptions(uri=bag_path, storage_id='mcap')
     converter_options = ConverterOptions('', '')  # bez konverzije
     reader = SequentialReader()
     reader.open(storage_options, converter_options)
@@ -30,7 +33,7 @@ def main():
             pose_msg = deserialize_message(data, TurtlePose)
             x_positions.append(pose_msg.x)
             y_positions.append(pose_msg.y)
-        elif topic == '/znamenitost':
+        elif topic == '/znamenitosti':
             zn_msg = deserialize_message(data, Znamenitost)
             oznacene_x.append(zn_msg.pose.x)
             oznacene_y.append(zn_msg.pose.y)
