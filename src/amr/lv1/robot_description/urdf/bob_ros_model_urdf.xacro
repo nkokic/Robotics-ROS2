@@ -81,7 +81,7 @@
             <axis xyz="0 0 1"/>
             <parent link="base_link"/>
             <child link="lidar_link"/>
-            <origin rpy="0 0 3.14" xyz="0 0 .15"/>
+            <origin rpy="0 0 0" xyz="0 0 .15"/>
         </joint>
 
         <link name= "camera_link">
