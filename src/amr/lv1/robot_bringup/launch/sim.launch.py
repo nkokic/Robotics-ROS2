@@ -33,6 +33,12 @@ def generate_launch_description():
         'gz_bridge.yaml'
     ])
 
+    rviz_config = PathJoinSubstitution([
+        bringup_pkg,
+        'config',
+        'navigation.rviz'
+    ])
+
     # ---------------- Robot Description ----------------
 
     robot_description = {
@@ -71,9 +77,9 @@ def generate_launch_description():
         arguments=[
             '-topic', 'robot_description',
             '-name', 'bob',
-            '-x', '0.0',
+            '-x', '-8.0',
             '-y', '0.0',
-            '-z', '0.05'
+            '-z', '0.2'
         ],
         output='screen'
     )
@@ -95,6 +101,28 @@ def generate_launch_description():
         executable='navigation_server'
     )
 
+    rviz = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', rviz_config],
+        output='screen'
+    )
+
+    lidar_static_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='lidar_tf',
+        arguments=[
+            '0', '0', '0',
+            '0', '0', '0',
+            'lidar_link',
+            'lidar_frame'
+        ],
+        output='screen'
+    )
+
+
     # ---------------- Launch Description ----------------
 
     return LaunchDescription([
@@ -102,5 +130,7 @@ def generate_launch_description():
         robot_state_publisher,
         spawn_robot,
         bridge,
-        navigation
+        navigation,
+        rviz,
+        lidar_static_tf
     ])
