@@ -15,8 +15,17 @@
 
     <let name="gazebo_config_path" 
          value="$(find-pkg-share robot_bringup)/config/gz_bridge.yaml" />
+    
     <node pkg="ros_gz_bridge" exec="parameter_bridge">
         <param name="config_file" value="$(var gazebo_config_path)" />
-    </node> 
+    </node>
+
+    <let name="rviz_config_path"
+        value="$(find-pkg-share robot_bringup)/config/navigation.rviz" />
     
+    <node pkg="rviz2" exec="rviz2" args="-d $(var rviz_config_path)" />
+
+   <node pkg="tf2_ros" exec="static_transform_publisher" name="lidar_tf"
+      args="0 0 0 0 0 0 lidar_link lidar_frame"/>
+
 </launch>
