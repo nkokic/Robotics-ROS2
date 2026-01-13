@@ -4,11 +4,11 @@
     <let name="gazebo_config_path" 
          value="$(find-pkg-share robot_bringup)/config/gz_bridge.yaml" />
     <let name="gazebo_world_path" 
-         value="$(find-pkg-share robot_bringup)/world/depot.sdf" />
+         value="$(find-pkg-share robot_bringup)/worlds/depot.sdf" />
     <let name="map_path" 
          value="$(find-pkg-share robot_bringup)/maps/depot.yaml" />
     <let name="nav2_config_path" 
-         value="$(find-pkg-share robot_bringup)/config/nav2_params_2.yaml" />
+         value="$(find-pkg-share robot_bringup)/config/nav2_params_simple.yaml" />
     <let name="rviz_config_path"
          value="$(find-pkg-share robot_bringup)/config/navigation.rviz" />
 
@@ -19,8 +19,6 @@
     <node pkg="nav2_map_server" exec="map_server" name="map_server" respawn="True" respawn_delay="2.0">
         <param from="$(var nav2_config_path)" />
         <param name="yaml_filename" value="$(var map_path)" />
-        <remap from="/tf" to="tf" />
-        <remap from="/tf_static" to="tf_static" />
     </node>
 
     <node pkg="nav2_amcl" exec="amcl" name="amcl" respawn="True" respawn_delay="2.0">
@@ -68,4 +66,7 @@
     </node> 
 
    <node pkg="rviz2" exec="rviz2" args="-d $(var rviz_config_path)" />
+
+   <node pkg="tf2_ros" exec="static_transform_publisher" name="lidar_tf"
+      args="0 0 0 0 0 0 lidar_link lidar_frame"/>
 </launch>

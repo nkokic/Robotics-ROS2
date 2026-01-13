@@ -5,4 +5,5 @@
     <xacro:include filename="bob_ros_gz_urdf.xacro"/>
 
     <xacro:bob_ros/>
+    <xacro:bob_ros_gz/>
 </robot>
