@@ -77,8 +77,6 @@ class BugNavigationServer(Node):
 
             distance = math.sqrt((goal_x - self.pose.position.x) ** 2 +
                                  (goal_y - self.pose.position.y) ** 2)
-            
-            self.get_logger().info(f"Distance to goal: {distance:.2f} m")
 
             feedback = NavigateRelative.Feedback()
             feedback.distance_remaining = distance
