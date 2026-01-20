@@ -1,209 +1,202 @@
-#!/usr/bin/env python3
-
+import math
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer
 from geometry_msgs.msg import Twist
-from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
-from math import atan2, sqrt, radians, sin, cos, pi
-from tf_transformations import euler_from_quaternion
+from nav_msgs.msg import Odometry
+import time
 
 from bob_robot_interfaces.action import NavigateRelative
 
 
-def normalize_angle(a):
-    while a > pi:
-        a -= 2 * pi
-    while a < -pi:
-        a += 2 * pi
-    return a
-
-
-class NavigationServer(Node):
+class BugNavigationServer(Node):
 
     def __init__(self):
-        super().__init__('navigation_server')
+        super().__init__('bug_navigation_server')
 
-        # Publishers / Subscribers
-        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.create_subscription(Odometry, '/odom', self.odom_cb, 10)
-        self.create_subscription(LaserScan, '/scan', self.scan_cb, 10)
+        self.cmd_pub = self.create_publisher(Twist, 'cmd_vel', 10)
 
-        # Action server
+        self.scan_sub = self.create_subscription(
+            LaserScan, 'scan', self.scan_callback, 10)
+
+        self.odom_sub = self.create_subscription(
+            Odometry, 'odom', self.odom_callback, 10)
+
         self.action_server = ActionServer(
             self,
             NavigateRelative,
             'navigate_relative',
-            self.execute_callback
-        )
+            self.execute_callback)
 
-        # Timer (10 Hz control loop)
-        self.timer = self.create_timer(0.1, self.control_loop)
-
-        # Robot state
-        self.x = 0.0
-        self.y = 0.0
-        self.yaw = 0.0
         self.scan = None
+        self.pose = None
+        self.goal = None
 
-        # Navigation state
-        self.active_goal = None
-        self.state = 'IDLE'
+        # Parameters
+        self.safe_distance = 1.0
+        self.linear_speed = 0.4
+        self.angular_speed = 0.6
 
-        self.target_x = 0.0
-        self.target_y = 0.0
-        self.target_yaw = 0.0
+        self.get_logger().info("Bug Navigation Server started")
 
-        self.get_logger().info("Navigation server (timer-based) started")
+    # ----------------------------------------------------
 
-    # --------------------------------------------------
-    # Callbacks
-    # --------------------------------------------------
+    def scan_callback(self, msg):
+        self.scan = msg
 
-    def odom_cb(self, msg):
-        self.x = msg.pose.pose.position.x
-        self.y = msg.pose.pose.position.y
-        q = msg.pose.pose.orientation
-        _, _, self.yaw = euler_from_quaternion([q.x, q.y, q.z, q.w])
+    def odom_callback(self, msg):
+        self.pose = msg.pose.pose
 
-    def scan_cb(self, msg):
-        self.scan = msg.ranges
-
-    # --------------------------------------------------
-    # Action callback (NON-BLOCKING)
-    # --------------------------------------------------
+    # ----------------------------------------------------
 
     def execute_callback(self, goal_handle):
-        self.get_logger().info("New navigation goal accepted")
+        self.get_logger().info("New navigation goal received")
 
-        dx = goal_handle.request.x
-        dy = goal_handle.request.y
-        dtheta = radians(goal_handle.request.theta_deg)
+        # Wait for sensors
+        while self.scan is None or self.pose is None:
+            rclpy.spin_once(self)
 
-        start_yaw = self.yaw
+        closest_point_dist = float('inf')
+        closest_point_pose = None
+        hit_point = None
+        following_wall = False
 
-        # Relative → absolute goal
-        self.target_x = self.x + dx * cos(start_yaw) - dy * sin(start_yaw)
-        self.target_y = self.y + dx * sin(start_yaw) + dy * cos(start_yaw)
-        self.target_yaw = normalize_angle(start_yaw + dtheta)
+        # Relativni cilj iz akcije (base_link)
+        start_x = self.pose.position.x
+        start_y = self.pose.position.y
+        start_yaw = self.get_yaw()
 
-        self.active_goal = goal_handle
-        self.state = 'ROTATE_TO_TARGET'
+        # Transformacija base_link → odom
+        goal_x = start_x + goal_handle.request.x * math.cos(start_yaw) - goal_handle.request.y * math.sin(start_yaw)
+        goal_y = start_y + goal_handle.request.x * math.sin(start_yaw) + goal_handle.request.y * math.cos(start_yaw)
+        goal_yaw = self.normalize_angle(start_yaw + goal_handle.request.theta_deg * math.pi / 180.0)
 
-        return NavigateRelative.Result()  # NE BLOKIRATI
+        while rclpy.ok():
+            rclpy.spin_once(self, timeout_sec=0.0)
 
-    # --------------------------------------------------
-    # Control loop (TIMER)
-    # --------------------------------------------------
+            distance = math.sqrt((goal_x - self.pose.position.x) ** 2 +
+                                 (goal_y - self.pose.position.y) ** 2)
+            
+            self.get_logger().info(f"Distance to goal: {distance:.2f} m")
 
-    def control_loop(self):
+            feedback = NavigateRelative.Feedback()
+            feedback.distance_remaining = distance
+            goal_handle.publish_feedback(feedback)
 
-        if self.state == 'IDLE' or self.active_goal is None:
-            return
-
-        # Distance to target
-        dx = self.target_x - self.x
-        dy = self.target_y - self.y
-        distance = sqrt(dx*dx + dy*dy)
-
-        # Feedback
-        feedback = NavigateRelative.Feedback()
-        feedback.distance_remaining = distance
-        self.active_goal.publish_feedback(feedback)
-
-        # ---------------- STATES ----------------
-        
-        self.get_logger().info(f"{self.state} \n x: {self.x},\n y:{self.y},\n angle:{self.yaw}")
-
-        if self.state == 'ROTATE_TO_TARGET':
-            desired_yaw = atan2(dy, dx)
-            err = normalize_angle(desired_yaw - self.yaw)
-
-            if abs(err) < 0.05:
+            if distance < 0.2:
                 self.stop()
-                self.state = 'FORWARD'
+                self.rotate_to(goal_yaw)
+                goal_handle.succeed()
+                return NavigateRelative.Result(success=True)
+
+            if self.is_obstacle_ahead():
+                if not following_wall:
+                    hit_point = (self.pose.position.x, self.pose.position.y)
+                    closest_point_dist = distance
+                    closest_point_pose = hit_point
+                    following_wall = True
+
+                self.follow_wall()
+
+                d = self.distance_to_goal(goal_x, goal_y)
+                if d < closest_point_dist:
+                    closest_point_dist = d
+                    closest_point_pose = (
+                        self.pose.position.x,
+                        self.pose.position.y
+                    )
+
+                if self.distance_between(
+                        (self.pose.position.x, self.pose.position.y),
+                        hit_point) < 0.3:
+                    # Completed one loop
+                    self.go_to_point(closest_point_pose)
+                    following_wall = False
+
             else:
-                self.rotate(err)
+                self.go_straight_to(goal_x, goal_y)
 
-        elif self.state == 'FORWARD':
-            if distance < 0.15:
-                self.stop()
-                self.state = 'ROTATE_FINAL'
-            elif self.obstacle_ahead():
-                self.stop()
-                self.state = 'AVOID_OBSTACLE'
-            else:
-                self.forward()
+            time.sleep(0.1)
 
-        elif self.state == 'AVOID_OBSTACLE':
-            free_yaw = self.find_free_direction()
-            err = normalize_angle(free_yaw - self.yaw)
+        goal_handle.abort()
+        return NavigateRelative.Result(success=False)
 
-            if abs(err) < 0.05:
-                self.state = 'FORWARD'
-            else:
-                self.rotate(err)
+    # ----------------------------------------------------
+    # Motion primitives
+    # ----------------------------------------------------
 
-        elif self.state == 'ROTATE_FINAL':
-            err = normalize_angle(self.target_yaw - self.yaw)
+    def go_straight_to(self, x, y):
+        target_angle = math.atan2(
+            y - self.pose.position.y,
+            x - self.pose.position.x)
 
-            if abs(err) < 0.05:
-                self.stop()
-                self.active_goal.succeed()
-                result = NavigateRelative.Result()
-                result.success = True
-                self.active_goal.set_result(result)
-                self.active_goal = None
-                self.state = 'IDLE'
-                self.get_logger().info("Goal reached")
-            else:
-                self.rotate(err)
+        angle_error = self.normalize_angle(target_angle - self.get_yaw())
 
-    # --------------------------------------------------
-    # Motion helpers
-    # --------------------------------------------------
+        cmd = Twist()
+        cmd.linear.x = self.linear_speed
+        cmd.angular.z = angle_error
+        self.cmd_pub.publish(cmd)
+
+    def follow_wall(self):
+        cmd = Twist()
+        cmd.linear.x = 0.1
+        cmd.angular.z = -self.angular_speed
+        self.cmd_pub.publish(cmd)
+
+    def rotate_to(self, target_yaw):
+        while abs(self.normalize_angle(target_yaw - self.get_yaw())) > 0.05:
+            cmd = Twist()
+            cmd.angular.z = self.angular_speed * \
+                math.copysign(1, self.normalize_angle(target_yaw - self.get_yaw()))
+            self.cmd_pub.publish(cmd)
+            rclpy.spin_once(self)
+
+        self.stop()
+
+    def go_to_point(self, point):
+        while self.distance_between(
+                (self.pose.position.x, self.pose.position.y), point) > 0.2:
+            self.go_straight_to(point[0], point[1])
+            rclpy.spin_once(self)
 
     def stop(self):
         self.cmd_pub.publish(Twist())
 
-    def rotate(self, err):
-        cmd = Twist()
-        cmd.angular.z = 0.6 if err > 0 else -0.6
-        self.cmd_pub.publish(cmd)
-        
+    # ----------------------------------------------------
+    # Helpers
+    # ----------------------------------------------------
 
-    def forward(self):
-        cmd = Twist()
-        cmd.linear.x = 0.25
-        self.cmd_pub.publish(cmd)
+    def is_obstacle_ahead(self):
+        center = len(self.scan.ranges) // 2
+        front = self.scan.ranges[center - 20:center + 20]
+        return min(front) < self.safe_distance
 
-    def obstacle_ahead(self, limit=0.6):
-        if self.scan is None:
-            return False
-        center = len(self.scan) // 2
-        for i in range(center - 10, center + 10):
-            if self.scan[i] < limit:
-                return True
-        return False
+    def distance_to_goal(self, x, y):
+        return math.hypot(
+            x - self.pose.position.x,
+            y - self.pose.position.y)
 
-    def find_free_direction(self):
-        center = len(self.scan) // 2
-        for i in range(20, center):
-            if self.scan[center + i] > 1.0:
-                return self.yaw - radians(i)
-            if self.scan[center - i] > 1.0:
-                return self.yaw + radians(i)
-        return self.yaw
+    def distance_between(self, a, b):
+        return math.hypot(a[0] - b[0], a[1] - b[1])
 
+    def get_yaw(self):
+        q = self.pose.orientation
+        return math.atan2(
+            2.0 * (q.w * q.z + q.x * q.y),
+            1.0 - 2.0 * (q.y * q.y + q.z * q.z))
 
-# --------------------------------------------------
-# Main
-# --------------------------------------------------
+    def normalize_angle(self, a):
+        while a > math.pi:
+            a -= 2 * math.pi
+        while a < -math.pi:
+            a += 2 * math.pi
+        return a
+
 
 def main():
     rclpy.init()
-    node = NavigationServer()
+    node = BugNavigationServer()
     rclpy.spin(node)
     rclpy.shutdown()
 

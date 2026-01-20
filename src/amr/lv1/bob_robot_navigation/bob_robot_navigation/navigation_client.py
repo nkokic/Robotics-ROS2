@@ -1,77 +1,58 @@
-#!/usr/bin/env python3
-
 import rclpy
-import asyncio
-import threading
 from rclpy.node import Node
 from rclpy.action import ActionClient
-from rclpy.executors import MultiThreadedExecutor
-
 from bob_robot_interfaces.action import NavigateRelative
 
 
-class NavigationClient(Node):
+class BugNavigationClient(Node):
 
     def __init__(self):
-        super().__init__('navigation_client')
+        super().__init__('bug_navigation_client')
         self.client = ActionClient(self, NavigateRelative, 'navigate_relative')
 
-    async def send_goal(self):
-
-        if not self.client.wait_for_server(timeout_sec=5.0):
-            self.get_logger().error("Action server not available")
-            return
-
+    def send_goal(self, x, y, theta):
         goal = NavigateRelative.Goal()
-        goal.x = float(input("Unesi x [m]: "))
-        goal.y = float(input("Unesi y [m]: "))
-        goal.theta_deg = float(input("Unesi theta [deg]: "))
+        goal.x = x
+        goal.y = y
+        goal.theta_deg = theta
 
-        self.get_logger().info("Sending goal")
-
-        goal_handle = await self.client.send_goal_async(
+        self.client.wait_for_server()
+        self.send_future = self.client.send_goal_async(
             goal,
-            feedback_callback=self.feedback_cb
-        )
+            feedback_callback=self.feedback_cb)
 
-        if not goal_handle.accepted:
-            self.get_logger().error("Goal rejected")
+        self.send_future.add_done_callback(self.goal_response_cb)
+
+    def goal_response_cb(self, future):
+        self.goal_handle = future.result()
+        if not self.goal_handle.accepted:
+            self.get_logger().info('Goal rejected')
             return
 
-        self.get_logger().info("Goal accepted")
+        self.get_logger().info('Goal accepted')
+        self.result_future = self.goal_handle.get_result_async()
+        self.result_future.add_done_callback(self.result_cb)
 
-        try:
-            result = await asyncio.wait_for(
-                goal_handle.get_result_async(),
-                timeout=120.0
-            )
-            print("\n=== RESULT ===")
-            print("Success:", result.result.success)
+    def feedback_cb(self, feedback):
+        self.get_logger().info(
+            f"Remaining distance: {feedback.feedback.distance_remaining:.2f} m")
 
-        except asyncio.TimeoutError:
-            self.get_logger().error("Timeout – cancelling goal")
-            await goal_handle.cancel_goal_async()
-
-    def feedback_cb(self, msg):
-        print(f"[FEEDBACK] Distance remaining: {msg.feedback.distance_remaining:.2f} m")
+    def result_cb(self, future):
+        result = future.result().result
+        self.get_logger().info(f"Navigation success: {result.success}")
+        rclpy.shutdown()
 
 
 def main():
     rclpy.init()
+    node = BugNavigationClient()
 
-    node = NavigationClient()
+    x = float(input("Enter x [m]: "))
+    y = float(input("Enter y [m]: "))
+    theta = float(input("Enter theta [deg]: "))
 
-    # ROS executor in separate thread
-    executor = MultiThreadedExecutor()
-    executor.add_node(node)
-
-    executor_thread = threading.Thread(target=executor.spin, daemon=True)
-    executor_thread.start()
-
-    # asyncio logic
-    asyncio.run(node.send_goal())
-
-    rclpy.shutdown()
+    node.send_goal(x, y, theta)
+    rclpy.spin(node)
 
 
 if __name__ == '__main__':
