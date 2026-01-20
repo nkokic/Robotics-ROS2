@@ -1,4 +1,0 @@
-<launch>
-    <node pkg="py_pkg" exec="complex_pub"/>
-    <node pkg="py_pkg" exec="complex_sub"/>
-</launch>

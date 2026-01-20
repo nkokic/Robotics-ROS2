@@ -83,5 +83,6 @@
         "/home/student/Robotics-ROS2/install/nrs_lv2_zad/lib/python3.12/site-packages",
         "/opt/ros/jazzy/lib/python3.12/site-packages",
         "/home/student/Robotics-ROS2/src/nrs-lv2/pymoveit2/pymoveit2/moveit2.py"
-    ]
+    ],
+    "ROS2.distro": "jazzy"
 }
