@@ -504,7 +504,7 @@ if __name__ == '__main__':
                             axis_pos=-1,
                             r=np.array([0.01, -0.5*door_params[0]]),
                             T_A_S=T_A_S, 
-                            save_path='/home/user/cabinet.urdf',
+                            save_path='./nrs_lv_ws/src/lv3/cabinet.urdf',
                             has_handle=False,
                             initial_angle_deg=10.
                             )

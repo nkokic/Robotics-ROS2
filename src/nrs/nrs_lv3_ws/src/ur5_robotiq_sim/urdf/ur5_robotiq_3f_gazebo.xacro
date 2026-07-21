@@ -22,6 +22,9 @@
     <xacro:include
         filename="$(find robotiq_description)/urdf/robotiq_3f_gripper_articulated_macro.xacro" />
 
+    <!-- Include FT300 macro -->
+    <xacro:include filename="$(find robotiq_description)/urdf/robotiq_ft300.urdf.xacro"/>
+
     <!-- Include UR macro -->
     <xacro:include filename="$(find ur_description)/urdf/ur_macro.xacro" />
 
@@ -42,14 +45,19 @@
         <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
     </xacro:ur_robot>
 
+    <xacro:robotiq_ft300 parent="tool0" tf_prefix="$(arg tf_prefix)">
+        <origin xyz="0 0 -0.004" rpy="0 0 0"/>
+    </xacro:robotiq_ft300>
+    
+        
     <!-- Add gripper -->
     <xacro:robotiq_3f_gripper_articulated prefix="rq_" />
 
     <!-- Attach gripper to UR5 tool0 -->
     <joint name="gripper_tool0_joint" type="fixed">
         <origin xyz="0 0 0.0535" rpy="${-pi/2} ${-pi} ${-pi/4}" />
-        <parent link="tool0" />
+        <parent link="robotiq_ft_frame_id" />
         <child link="rq_palm" />
     </joint>
-
+    
 </robot>
