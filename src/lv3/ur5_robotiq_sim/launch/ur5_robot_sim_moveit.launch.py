@@ -75,7 +75,7 @@ def launch_setup(context, *args, **kwargs):
             package='ros_gz_sim',
             executable='create',
             arguments=[
-                '-file', './src/nrs/nrs_lv3_ws/src/cabinet.urdf',
+                '-file', './src/lv3/cabinet.urdf',
                 '-name', 'cabinet',
                 '-allow_renaming', 'true',
                 '-x', '-0.2',
