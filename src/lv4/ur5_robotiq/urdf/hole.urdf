@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<robot name="hole_model">
+  <link name="hole_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ur5_robotiq/models/hole.stl" />
+      </geometry>
+      <material name="gray">
+        <color rgba="0.5 0.5 0.5 1.0" />
+      </material>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://ur5_robotiq/models/hole.stl" />
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <mass value="10.0" />
+      <inertia
+        ixx="1e-4" ixy="0.0" ixz="0.0"
+        iyy="1e-4" iyz="0.0"
+        izz="1e-4" />
+    </inertial>
+  </link>
+</robot>
