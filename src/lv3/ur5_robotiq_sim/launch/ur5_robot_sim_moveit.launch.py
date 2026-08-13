@@ -28,6 +28,7 @@
 #
 # Author: Denis Stogl
 
+from launch_ros.actions import Node
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -69,9 +70,38 @@ def launch_setup(context, *args, **kwargs):
         }.items(),
     )
 
+    spawn_cabinet = LaunchDescription([
+        Node(
+            package='ros_gz_sim',
+            executable='create',
+            arguments=[
+                '-file', './src/nrs/nrs_lv3_ws/src/cabinet.urdf',
+                '-name', 'cabinet',
+                '-allow_renaming', 'true',
+                '-x', '-0.2',
+                '-y', '0.4',
+                '-z', '0.948',
+                '-R', '0',
+                '-P', '0',
+                '-Y', '-1.57',
+            ],
+            output='screen',
+        )
+    ])
+
+    """ robot_control = LaunchDescription([
+        Node(
+            package='robot_control',
+            executable='spawn_and_open_drawer',
+        )
+    ]) 
+    """
+
     nodes_to_launch = [
         ur_control_launch,
         ur_moveit_launch,
+        spawn_cabinet,
+        # robot_control,
     ]
 
     return nodes_to_launch

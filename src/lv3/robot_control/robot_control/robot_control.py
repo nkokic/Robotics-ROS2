@@ -47,7 +47,7 @@ def main(args=None):
     logger_spawn.info("Cabinet created")
     rclpy.init(args=args)
 
-    initial_pose = np.array([-0.2, 0.4, 0.948, 0., 0., -0.706825, 0.707388])
+    cabinetPose = np.array([-0.2, 0.4, 0.948, 0., 0., -0.706825, 0.707388])
 
     moveit_config = (
     MoveItConfigsBuilder(robot_name="ur5_robotiq_3f", package_name="ur5_robotiq_moveit_config")
@@ -70,13 +70,13 @@ def main(args=None):
     # set plan start state to current state
     arm.set_start_state_to_current_state()
 
-    # Build transforms using proper matrix multiplication (not element-wise '*')
-    T_O_W = quaternion_matrix(initial_pose[3:])
-    T_O_W[0, 3] = initial_pose[0]
-    T_O_W[1, 3] = initial_pose[1]
-    T_O_W[2, 3] = initial_pose[2]
-    T_A_O = cabinet_model.T_A_O_init
-    T_D_A = cabinet_model.T_D_A_init
+    # Build transforms using proper matrix multiplication
+    transformCabinet2World = quaternion_matrix(cabinetPose[3:])
+    transformCabinet2World[0, 3] = cabinetPose[0]
+    transformCabinet2World[1, 3] = cabinetPose[1]
+    transformCabinet2World[2, 3] = cabinetPose[2]
+    transformAxis2Cabinet = cabinet_model.T_A_O_init # cabinet door axis to cabinet origin transform
+    transformCorner2Axis = cabinet_model.T_D_A_init # cabinet door corner to cabinet door axis transform
 
     waypoints_node = rclpy.create_node('waypoints_publisher')
     waypoints_pub = waypoints_node.create_publisher(PointCloud, '/waypoints', 10)
@@ -86,20 +86,20 @@ def main(args=None):
     tf_listener = tf2_ros.TransformListener(tf_buffer, waypoints_node)
     
     # Wait for the TF to become available (spin while waiting)
-    T_T_G = None
-    T_W_B = None
+    transformGripper2Tool = None
+    transformRobotbase2World = None
     logger.info("Waiting for TF tool0 -> gripper...")
-    while T_T_G is None and T_W_B is None:
+    while transformGripper2Tool is None and transformRobotbase2World is None:
         rclpy.spin_once(waypoints_node, timeout_sec=0.1)
         try:
             transform = tf_buffer.lookup_transform('tool0', 'gripper', rclpy.time.Time(), timeout=Duration(seconds=0.5))
             # Convert TransformStamped to 4x4 matrix
             t = transform.transform.translation
             q = transform.transform.rotation
-            T_T_G = quaternion_matrix([q.x, q.y, q.z, q.w])
-            T_T_G[0, 3] = t.x
-            T_T_G[1, 3] = t.y
-            T_T_G[2, 3] = t.z
+            transformGripper2Tool = quaternion_matrix([q.x, q.y, q.z, q.w])
+            transformGripper2Tool[0, 3] = t.x
+            transformGripper2Tool[1, 3] = t.y
+            transformGripper2Tool[2, 3] = t.z
             logger.info(f"TF tool0 -> gripper obtained: translation=({t.x:.3f}, {t.y:.3f}, {t.z:.3f})")
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             logger.info(f"Waiting for TF... ({type(e).__name__})")
@@ -112,30 +112,30 @@ def main(args=None):
             # Convert TransformStamped to 4x4 matrix
             t = transform.transform.translation
             q = transform.transform.rotation
-            T_W_B = quaternion_matrix([q.x, q.y, q.z, q.w])
-            T_W_B[0, 3] = t.x
-            T_W_B[1, 3] = t.y
-            T_W_B[2, 3] = t.z
+            transformRobotbase2World = quaternion_matrix([q.x, q.y, q.z, q.w])
+            transformRobotbase2World[0, 3] = t.x
+            transformRobotbase2World[1, 3] = t.y
+            transformRobotbase2World[2, 3] = t.z
             logger.info(f"TF world -> base_link obtained: translation=({t.x:.3f}, {t.y:.3f}, {t.z:.3f})")
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             logger.info(f"Waiting for TF... ({type(e).__name__})")
             continue
 
-    T_D_W = []
-    for i in range(int(initial_angle_deg), 91, 10):
+    transformListCorner2World = []
+    for i in range(int(initial_angle_deg), 91, 15):
         rotation = quaternion_from_euler(0, 0, math.radians(-i))
-        matrix = quaternion_matrix(rotation)
+        offsetMatrix = quaternion_matrix(rotation)
         # Compose transforms with '@' for matrix multiply to maintain a valid rotation
-        T_D_W_i = T_O_W @ T_A_O @ matrix @ T_D_A
-        T_D_W.append(T_D_W_i)
+        transformICorner2World = transformCabinet2World @ transformAxis2Cabinet @ offsetMatrix @ transformCorner2Axis
+        transformListCorner2World.append(transformICorner2World)
 
     # Build target tool poses in base_link frame: T_T_B = T_B_W @ T_D_W @ T_G_D @ T_T_G
     # We need the inverse of T_W_B to go from world to base_link
-    T_B_W = np.linalg.inv(T_W_B)
-    T_G_T = np.linalg.inv(T_T_G)
+    transformWorld2Robotbase = np.linalg.inv(transformRobotbase2World)
+    transformTool2Gripper = np.linalg.inv(transformGripper2Tool)
     
-    T_T_B_list = []
-    T_G_D = np.array([
+    transformListRobotbase2Tool = []
+    transformCorner2Gripper = np.array([
         [0, 0, 1, -0.02],
         [0, 1, 0, 0.03],
         [-1, 0, 0, 0.005],
@@ -143,28 +143,28 @@ def main(args=None):
     ])
 
 
-    for T_D_W_i in T_D_W:
-        T_T_B_i = T_B_W @ T_D_W_i @ T_G_D @ T_G_T
-        T_T_B_list.append(T_T_B_i)
+    for transformICorner2World in transformListCorner2World:
+        transformIRobotbase2Tool = transformWorld2Robotbase @ transformICorner2World @ transformCorner2Gripper @ transformTool2Gripper
+        transformListRobotbase2Tool.append(transformIRobotbase2Tool)
     
 
     waypoints = []
-    for point in T_T_B_list:
-        pose_goal = PoseStamped()
-        pose_goal.header.frame_id = "base_link"
-        pose_goal.pose.position.x = float(point[0, 3])
-        pose_goal.pose.position.y = float(point[1, 3])
-        pose_goal.pose.position.z = float(point[2, 3])
+    for point in transformListRobotbase2Tool:
+        poseGoal = PoseStamped()
+        poseGoal.header.frame_id = "base_link"
+        poseGoal.pose.position.x = float(point[0, 3])
+        poseGoal.pose.position.y = float(point[1, 3])
+        poseGoal.pose.position.z = float(point[2, 3])
         quaternion = quaternion_from_matrix(point)
-        pose_goal.pose.orientation.x = quaternion[0]
-        pose_goal.pose.orientation.y = quaternion[1]
-        pose_goal.pose.orientation.z = quaternion[2]
-        pose_goal.pose.orientation.w = quaternion[3]
-        waypoints.append(pose_goal)
+        poseGoal.pose.orientation.x = quaternion[0]
+        poseGoal.pose.orientation.y = quaternion[1]
+        poseGoal.pose.orientation.z = quaternion[2]
+        poseGoal.pose.orientation.w = quaternion[3]
+        waypoints.append(poseGoal)
 
-    approach_point = copy.deepcopy(waypoints[0])
-    approach_point.pose.position.z += 0.1
-    waypoints.insert(0, approach_point)
+    approachPoint = copy.deepcopy(waypoints[0])
+    approachPoint.pose.position.z += 0.1
+    waypoints.insert(0, approachPoint)
 
     # Persistent waypoints publisher as a PointCloud on '/waypoints'
     cloud_msg = PointCloud()

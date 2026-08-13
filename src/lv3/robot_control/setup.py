@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'spawn_and_open_drawer = robot_control.spawn_and_open_drawer:main',
+            'robot_control = robot_control.robot_control:main',
         ],
     },
 )
