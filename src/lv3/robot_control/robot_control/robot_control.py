@@ -1,222 +1,850 @@
-from cabinet_generator.cabinet_model import Cabinet, rot_z
-from cabinet_generator.generate_and_spawn_cabinet import CabinetSpawner
-import numpy as np
-import os
-import math
-import rclpy
-from rclpy.node import Node
-from rclpy.logging import get_logger
-from geometry_msgs.msg import PoseStamped, Pose, Point32
-from sensor_msgs.msg import PointCloud
-from std_msgs.msg import Bool
-from tf_transformations import quaternion_from_euler, quaternion_matrix, quaternion_from_matrix
-import tf2_ros
-from rclpy.duration import Duration
-# moveit_py
-from moveit.planning import MoveItPy
-from moveit.core.robot_state import RobotState
-from moveit.utils import create_params_file_from_dict
-from moveit.core.kinematic_constraints import construct_joint_constraint
-# config file libraries
-from moveit_configs_utils import MoveItConfigsBuilder
-from ament_index_python.packages import get_package_share_directory
+#!/usr/bin/env python3
+
 import copy
-import time
+import math
+import os
+
+import numpy as np
+import rclpy
+import tf2_ros
+
+from ament_index_python.packages import get_package_share_directory
+from cabinet_generator.cabinet_model import Cabinet, rot_z
+from geometry_msgs.msg import Point32, PoseStamped
+from moveit.planning import MoveItPy
+from moveit.utils import create_params_file_from_dict
+from moveit_configs_utils import MoveItConfigsBuilder
+from rclpy.duration import Duration
+from rclpy.logging import get_logger
+from sensor_msgs.msg import PointCloud
+from tf_transformations import (
+    quaternion_from_euler,
+    quaternion_from_matrix,
+    quaternion_matrix,
+)
 
 
+# =============================================================================
+# Configuration
+# =============================================================================
+
+RobotName = "ur5_robotiq_3f"
+MoveItPackageName = "ur5_robotiq_moveit_config"
+
+BaseFrame = "base_link"
+WorldFrame = "world"
+ToolFrame = "tool0"
+GripperFrame = "gripper"
+
+WaypointsTopic = "/waypoints"
 
 
-def main(args=None):
-    logger_spawn = get_logger("spawn_logger")
-    door_params = np.array([0.28, 0.35, 0.018, 0.3])
+# =============================================================================
+# Cabinet Setup
+# =============================================================================
 
-    Tz = np.eye(4)
-    Tz[:3,:3] = rot_z(np.radians(150))
-    T_A_S = np.eye(4)
-    T_A_S = Tz
-    T_A_S[:3,3] = np.array([-0.3, -0.4, 0.278])
-    initial_angle_deg = 20.
-    cabinet_model = Cabinet(door_params, 
-                            axis_pos=-1,
-                            r=np.array([0.01, -0.5*door_params[0]]),
-                            T_A_S=T_A_S, 
-                            save_path='./src/lv3/cabinet.urdf',
-                            has_handle=False,
-                            initial_angle_deg=initial_angle_deg
-                            )
-    logger_spawn.info("Cabinet created")
-    rclpy.init(args=args)
+def CreateCabinet(logger):
+    """
+    Create and configure the cabinet model.
 
-    cabinetPose = np.array([-0.2, 0.4, 0.948, 0., 0., -0.706825, 0.707388])
+    Returns:
+        Configured Cabinet instance.
+    """
 
-    moveit_config = (
-    MoveItConfigsBuilder(robot_name="ur5_robotiq_3f", package_name="ur5_robotiq_moveit_config")
-        .robot_description(file_path="config/ur5_robotiq_3f.urdf.xacro")
-        .trajectory_execution(file_path="config/moveit_controllers.yaml")
-        .moveit_cpp(file_path=os.path.join(get_package_share_directory("ur5_robotiq_moveit_config"),
-                        "config",
-                        "py_node_config.yaml",)).to_moveit_configs()).to_dict()
-    moveit_config.update({"use_sim_time": True})
-    file = create_params_file_from_dict(moveit_config, "/**")
-    # MoveItPy Setup
-    logger = get_logger("moveit_py.pose_goal")
-    # instantiate MoveItPy instance and get planning component
-    mpy = MoveItPy(node_name="moveit_py", launch_params_filepaths=[file])
-    arm = mpy.get_planning_component("arm")
-    logger.info("MoveItPy instance created")
-    # instantiate a RobotState instance using the current robot model
-    robot_model = mpy.get_robot_model()
-    robot_state = RobotState(robot_model)
-    # set plan start state to current state
-    arm.set_start_state_to_current_state()
+    doorParameters = np.array(
+        [
+            0.28,    # width
+            0.35,    # height
+            0.018,   # thickness
+            0.3,     # static thickness
+        ]
+    )
 
-    # Build transforms using proper matrix multiplication
-    transformCabinet2World = quaternion_matrix(cabinetPose[3:])
-    transformCabinet2World[0, 3] = cabinetPose[0]
-    transformCabinet2World[1, 3] = cabinetPose[1]
-    transformCabinet2World[2, 3] = cabinetPose[2]
-    transformAxis2Cabinet = cabinet_model.T_A_O_init # cabinet door axis to cabinet origin transform
-    transformCorner2Axis = cabinet_model.T_D_A_init # cabinet door corner to cabinet door axis transform
+    # -------------------------------------------------------------------------
+    # Cabinet orientation
+    # -------------------------------------------------------------------------
 
-    waypoints_node = rclpy.create_node('waypoints_publisher')
-    waypoints_pub = waypoints_node.create_publisher(PointCloud, '/waypoints', 10)
+    cabinetToWorldTransform = np.eye(4)
 
-    # TF2 listener to look up transform between tool0 and gripper
-    tf_buffer = tf2_ros.Buffer()
-    tf_listener = tf2_ros.TransformListener(tf_buffer, waypoints_node)
-    
-    # Wait for the TF to become available (spin while waiting)
-    transformGripper2Tool = None
-    transformRobotbase2World = None
-    logger.info("Waiting for TF tool0 -> gripper...")
-    while transformGripper2Tool is None and transformRobotbase2World is None:
-        rclpy.spin_once(waypoints_node, timeout_sec=0.1)
-        try:
-            transform = tf_buffer.lookup_transform('tool0', 'gripper', rclpy.time.Time(), timeout=Duration(seconds=0.5))
-            # Convert TransformStamped to 4x4 matrix
-            t = transform.transform.translation
-            q = transform.transform.rotation
-            transformGripper2Tool = quaternion_matrix([q.x, q.y, q.z, q.w])
-            transformGripper2Tool[0, 3] = t.x
-            transformGripper2Tool[1, 3] = t.y
-            transformGripper2Tool[2, 3] = t.z
-            logger.info(f"TF tool0 -> gripper obtained: translation=({t.x:.3f}, {t.y:.3f}, {t.z:.3f})")
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-            logger.info(f"Waiting for TF... ({type(e).__name__})")
-            continue
+    cabinetToWorldTransform[:3, :3] = rot_z(
+        np.radians(150)
+    )
 
-        logger.info("Waiting for TF world <- base_link...")
+    cabinetToWorldTransform[:3, 3] = np.array(
+        [
+            -0.3,
+            -0.4,
+            0.278,
+        ]
+    )
 
-        try:
-            transform = tf_buffer.lookup_transform('world', 'base_link', rclpy.time.Time(), timeout=Duration(seconds=0.5))
-            # Convert TransformStamped to 4x4 matrix
-            t = transform.transform.translation
-            q = transform.transform.rotation
-            transformRobotbase2World = quaternion_matrix([q.x, q.y, q.z, q.w])
-            transformRobotbase2World[0, 3] = t.x
-            transformRobotbase2World[1, 3] = t.y
-            transformRobotbase2World[2, 3] = t.z
-            logger.info(f"TF world -> base_link obtained: translation=({t.x:.3f}, {t.y:.3f}, {t.z:.3f})")
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-            logger.info(f"Waiting for TF... ({type(e).__name__})")
-            continue
+    initialDoorAngleDegrees = 20.0
 
-    transformListCorner2World = []
-    for i in range(int(initial_angle_deg), 91, 15):
-        rotation = quaternion_from_euler(0, 0, math.radians(-i))
-        offsetMatrix = quaternion_matrix(rotation)
-        # Compose transforms with '@' for matrix multiply to maintain a valid rotation
-        transformICorner2World = transformCabinet2World @ transformAxis2Cabinet @ offsetMatrix @ transformCorner2Axis
-        transformListCorner2World.append(transformICorner2World)
+    cabinet = Cabinet(
+        doorParameters,
+        axis_pos=-1,
+        r=np.array(
+            [
+                0.01,
+                -0.5 * doorParameters[0],
+            ]
+        ),
+        T_A_S=cabinetToWorldTransform,
+        save_path="./src/lv3/cabinet.urdf",
+        has_handle=False,
+        initial_angle_deg=initialDoorAngleDegrees,
+    )
 
-    # Build target tool poses in base_link frame: T_T_B = T_B_W @ T_D_W @ T_G_D @ T_T_G
-    # We need the inverse of T_W_B to go from world to base_link
-    transformWorld2Robotbase = np.linalg.inv(transformRobotbase2World)
-    transformTool2Gripper = np.linalg.inv(transformGripper2Tool)
-    
-    transformListRobotbase2Tool = []
-    transformCorner2Gripper = np.array([
-        [0, 0, 1, -0.02],
-        [0, 1, 0, 0.03],
-        [-1, 0, 0, 0.005],
-        [0, 0, 0, 1],
-    ])
+    logger.info("Cabinet created.")
+
+    return cabinet
 
 
-    for transformICorner2World in transformListCorner2World:
-        transformIRobotbase2Tool = transformWorld2Robotbase @ transformICorner2World @ transformCorner2Gripper @ transformTool2Gripper
-        transformListRobotbase2Tool.append(transformIRobotbase2Tool)
-    
+# =============================================================================
+# MoveIt Setup
+# =============================================================================
 
-    waypoints = []
-    for point in transformListRobotbase2Tool:
-        poseGoal = PoseStamped()
-        poseGoal.header.frame_id = "base_link"
-        poseGoal.pose.position.x = float(point[0, 3])
-        poseGoal.pose.position.y = float(point[1, 3])
-        poseGoal.pose.position.z = float(point[2, 3])
-        quaternion = quaternion_from_matrix(point)
-        poseGoal.pose.orientation.x = quaternion[0]
-        poseGoal.pose.orientation.y = quaternion[1]
-        poseGoal.pose.orientation.z = quaternion[2]
-        poseGoal.pose.orientation.w = quaternion[3]
-        waypoints.append(poseGoal)
+def CreateMoveItInstance(logger):
+    """
+    Initialize MoveItPy and return the planning component.
 
-    approachPoint = copy.deepcopy(waypoints[0])
-    approachPoint.pose.position.z += 0.1
-    waypoints.insert(0, approachPoint)
+    Returns:
+        Tuple containing:
+            - MoveItPy instance
+            - Arm planning component
+    """
 
-    # Persistent waypoints publisher as a PointCloud on '/waypoints'
-    cloud_msg = PointCloud()
-    cloud_msg.header.frame_id = "base_link"
-    cloud_msg.points = [
-        Point32(x=wp.pose.position.x, y=wp.pose.position.y, z=wp.pose.position.z)
-        for wp in waypoints
-    ]
+    moveItConfig = (
+        MoveItConfigsBuilder(
+            robot_name=RobotName,
+            package_name=MoveItPackageName,
+        )
+        .robot_description(
+            file_path="config/ur5_robotiq_3f.urdf.xacro"
+        )
+        .trajectory_execution(
+            file_path="config/moveit_controllers.yaml"
+        )
+        .moveit_cpp(
+            file_path=os.path.join(
+                get_package_share_directory(
+                    MoveItPackageName
+                ),
+                "config",
+                "py_node_config.yaml",
+            )
+        )
+        .to_moveit_configs()
+    ).to_dict()
 
-    
-    # Publish periodically so late subscribers can receive messages
-    def _publish_cloud():
-        cloud_msg.header.stamp = waypoints_node.get_clock().now().to_msg()
-        waypoints_pub.publish(cloud_msg)
+    moveItConfig.update(
+        {
+            "use_sim_time": True,
+        }
+    )
 
-    waypoints_node.create_timer(1.0, _publish_cloud)
+    parametersFile = create_params_file_from_dict(
+        moveItConfig,
+        "/**",
+    )
 
-    # Use the correct tip link for the 'arm' group as defined in SRDF (tip_link="tool0")
-    # Also give the planner a bit more time per request.
+    moveItInstance = MoveItPy(
+        node_name="moveit_py",
+        launch_params_filepaths=[
+            parametersFile
+        ],
+    )
+
+    armPlanningComponent = (
+        moveItInstance.get_planning_component("arm")
+    )
+
+    # Give the planner additional time for each request.
     try:
-        arm.set_planning_time(10.0)
+        armPlanningComponent.set_planning_time(10.0)
     except Exception:
         pass
 
-    for pose in waypoints:
-        arm.set_goal_state(pose_stamped_msg = pose, pose_link = "tool0")
-        logger.info("Planning trajectory")
-        plan_result = arm.plan()
-        if not plan_result:
-            pose.pose.position.x +=0.001
-            pose.pose.position.y +=0.001
-            pose.pose.position.z +=0.001
-            arm.set_goal_state(pose_stamped_msg = pose, pose_link = "tool0")
-            logger.info("Planning trajectory")
-            plan_result = arm.plan()
-        if plan_result:
-            logger.info("Executing plan")
-            robot_trajectory = plan_result.trajectory
-            mpy.execute(robot_trajectory, controllers=[])
-        else:
-            logger.error("Planning failed")
+    logger.info(
+        "MoveItPy instance created."
+    )
 
-    logger.info("Trajectory execution completed. Waypoints publisher running. Press Ctrl+C to exit.")
+    return (
+        moveItInstance,
+        armPlanningComponent,
+    )
+
+
+# =============================================================================
+# Transformation Helpers
+# =============================================================================
+
+def CreateTransformFromPose(
+    position: np.ndarray,
+    quaternion: np.ndarray,
+) -> np.ndarray:
+    """
+    Create a 4x4 homogeneous transformation matrix.
+
+    Args:
+        position: XYZ translation.
+        quaternion: XYZW quaternion.
+
+    Returns:
+        4x4 homogeneous transformation matrix.
+    """
+
+    transform = quaternion_matrix(quaternion)
+
+    transform[0, 3] = position[0]
+    transform[1, 3] = position[1]
+    transform[2, 3] = position[2]
+
+    return transform
+
+
+def GetTransformFromTf(
+    transformStamped,
+) -> np.ndarray:
+    """
+    Convert a ROS TransformStamped message into a 4x4 matrix.
+    """
+
+    translation = transformStamped.transform.translation
+    rotation = transformStamped.transform.rotation
+
+    return CreateTransformFromPose(
+        np.array(
+            [
+                translation.x,
+                translation.y,
+                translation.z,
+            ]
+        ),
+        np.array(
+            [
+                rotation.x,
+                rotation.y,
+                rotation.z,
+                rotation.w,
+            ]
+        ),
+    )
+
+
+# =============================================================================
+# TF Lookup
+# =============================================================================
+
+def WaitForRequiredTransforms(
+    node,
+    logger,
+):
+    """
+    Wait until the required TF transforms are available.
+
+    Required transforms:
+        tool0 <- gripper
+        world <- base_link
+
+    Returns:
+        Tuple containing:
+            - gripper-to-tool transform
+            - robot-base-to-world transform
+    """
+
+    tfBuffer = tf2_ros.Buffer()
+
+    tfListener = tf2_ros.TransformListener(
+        tfBuffer,
+        node,
+    )
+
+    gripperToToolTransform = None
+    robotBaseToWorldTransform = None
+
+    logger.info(
+        "Waiting for TF tool0 -> gripper..."
+    )
+
+    while (
+        gripperToToolTransform is None
+        or robotBaseToWorldTransform is None
+    ):
+        rclpy.spin_once(
+            node,
+            timeout_sec=0.1,
+        )
+
+        # ---------------------------------------------------------------------
+        # tool0 <- gripper
+        # ---------------------------------------------------------------------
+
+        if gripperToToolTransform is None:
+            try:
+                transform = tfBuffer.lookup_transform(
+                    ToolFrame,
+                    GripperFrame,
+                    rclpy.time.Time(),
+                    timeout=Duration(seconds=0.5),
+                )
+
+                gripperToToolTransform = (
+                    GetTransformFromTf(transform)
+                )
+
+                translation = (
+                    transform.transform.translation
+                )
+
+                logger.info(
+                    "TF tool0 -> gripper obtained: "
+                    f"translation=("
+                    f"{translation.x:.3f}, "
+                    f"{translation.y:.3f}, "
+                    f"{translation.z:.3f})"
+                )
+
+            except (
+                tf2_ros.LookupException,
+                tf2_ros.ConnectivityException,
+                tf2_ros.ExtrapolationException,
+            ) as exception:
+
+                logger.info(
+                    "Waiting for TF tool0 -> gripper... "
+                    f"({type(exception).__name__})"
+                )
+
+        # ---------------------------------------------------------------------
+        # world <- base_link
+        # ---------------------------------------------------------------------
+
+        if robotBaseToWorldTransform is None:
+            try:
+                transform = tfBuffer.lookup_transform(
+                    WorldFrame,
+                    BaseFrame,
+                    rclpy.time.Time(),
+                    timeout=Duration(seconds=0.5),
+                )
+
+                robotBaseToWorldTransform = (
+                    GetTransformFromTf(transform)
+                )
+
+                translation = (
+                    transform.transform.translation
+                )
+
+                logger.info(
+                    "TF world -> base_link obtained: "
+                    f"translation=("
+                    f"{translation.x:.3f}, "
+                    f"{translation.y:.3f}, "
+                    f"{translation.z:.3f})"
+                )
+
+            except (
+                tf2_ros.LookupException,
+                tf2_ros.ConnectivityException,
+                tf2_ros.ExtrapolationException,
+            ) as exception:
+
+                logger.info(
+                    "Waiting for TF world -> base_link... "
+                    f"({type(exception).__name__})"
+                )
+
+    return (
+        gripperToToolTransform,
+        robotBaseToWorldTransform,
+        tfListener,
+    )
+
+
+# =============================================================================
+# Cabinet Waypoint Generation
+# =============================================================================
+
+def CreateCabinetCornerTransforms(
+    cabinet,
+    cabinetPose: np.ndarray,
+    initialDoorAngleDegrees: float,
+) -> list[np.ndarray]:
+    """
+    Generate cabinet corner transforms for each door rotation angle.
+
+    Returns:
+        List of corner-to-world transformation matrices.
+    """
+
+    cabinetToWorldTransform = CreateTransformFromPose(
+        cabinetPose[:3],
+        cabinetPose[3:],
+    )
+
+    axisToCabinetTransform = (
+        cabinet.T_A_O_init
+    )
+
+    cornerToAxisTransform = (
+        cabinet.T_D_A_init
+    )
+
+    cornerToWorldTransforms = []
+
+    for doorAngleDegrees in range(
+        int(initialDoorAngleDegrees),
+        91,
+        15,
+    ):
+        doorRotation = quaternion_from_euler(
+            0.0,
+            0.0,
+            math.radians(-doorAngleDegrees),
+        )
+
+        doorRotationTransform = quaternion_matrix(
+            doorRotation
+        )
+
+        cornerToWorldTransform = (
+            cabinetToWorldTransform
+            @ axisToCabinetTransform
+            @ doorRotationTransform
+            @ cornerToAxisTransform
+        )
+
+        cornerToWorldTransforms.append(
+            cornerToWorldTransform
+        )
+
+    return cornerToWorldTransforms
+
+
+def CreateRobotToolTransforms(
+    cornerToWorldTransforms: list[np.ndarray],
+    robotBaseToWorldTransform: np.ndarray,
+    gripperToToolTransform: np.ndarray,
+) -> list[np.ndarray]:
+    """
+    Convert cabinet corner transforms into robot tool transforms.
+
+    The transformation chain is:
+
+        T_B_T =
+            T_B_W *
+            T_W_D *
+            T_D_G *
+            T_G_T
+    """
+
+    worldToRobotBaseTransform = np.linalg.inv(
+        robotBaseToWorldTransform
+    )
+
+    toolToGripperTransform = np.linalg.inv(
+        gripperToToolTransform
+    )
+
+    # -------------------------------------------------------------------------
+    # Corner-to-gripper transform.
+    # -------------------------------------------------------------------------
+
+    cornerToGripperTransform = np.array(
+        [
+            [0, 0, 1, -0.02],
+            [0, 1, 0, 0.03],
+            [-1, 0, 0, 0.005],
+            [0, 0, 0, 1],
+        ]
+    )
+
+    robotBaseToToolTransforms = []
+
+    for cornerToWorldTransform in cornerToWorldTransforms:
+
+        robotBaseToToolTransform = (
+            worldToRobotBaseTransform
+            @ cornerToWorldTransform
+            @ cornerToGripperTransform
+            @ toolToGripperTransform
+        )
+
+        robotBaseToToolTransforms.append(
+            robotBaseToToolTransform
+        )
+
+    return robotBaseToToolTransforms
+
+
+# =============================================================================
+# Pose Creation
+# =============================================================================
+
+def CreateWaypoints(
+    robotBaseToToolTransforms: list[np.ndarray],
+) -> list[PoseStamped]:
+    """
+    Convert transformation matrices into ROS PoseStamped waypoints.
+    """
+
+    waypoints = []
+
+    for transform in robotBaseToToolTransforms:
+
+        waypoint = PoseStamped()
+
+        waypoint.header.frame_id = BaseFrame
+
+        waypoint.pose.position.x = float(
+            transform[0, 3]
+        )
+
+        waypoint.pose.position.y = float(
+            transform[1, 3]
+        )
+
+        waypoint.pose.position.z = float(
+            transform[2, 3]
+        )
+
+        quaternion = quaternion_from_matrix(
+            transform
+        )
+
+        waypoint.pose.orientation.x = (
+            quaternion[0]
+        )
+
+        waypoint.pose.orientation.y = (
+            quaternion[1]
+        )
+
+        waypoint.pose.orientation.z = (
+            quaternion[2]
+        )
+
+        waypoint.pose.orientation.w = (
+            quaternion[3]
+        )
+
+        waypoints.append(waypoint)
+
+    # -------------------------------------------------------------------------
+    # Add an approach waypoint above the first waypoint.
+    # -------------------------------------------------------------------------
+
+    approachWaypoint = copy.deepcopy(
+        waypoints[0]
+    )
+
+    approachWaypoint.pose.position.z += 0.1
+
+    waypoints.insert(
+        0,
+        approachWaypoint,
+    )
+
+    return waypoints
+
+
+# =============================================================================
+# Waypoint Visualization
+# =============================================================================
+
+def CreateWaypointCloud(
+    waypoints: list[PoseStamped],
+) -> PointCloud:
+    """
+    Create a PointCloud message containing all waypoints.
+    """
+
+    pointCloud = PointCloud()
+
+    pointCloud.header.frame_id = BaseFrame
+
+    pointCloud.points = [
+        Point32(
+            x=waypoint.pose.position.x,
+            y=waypoint.pose.position.y,
+            z=waypoint.pose.position.z,
+        )
+        for waypoint in waypoints
+    ]
+
+    return pointCloud
+
+
+def CreateWaypointPublisher(
+    node,
+    waypoints: list[PoseStamped],
+):
+    """
+    Create a periodic waypoint PointCloud publisher.
+    """
+
+    waypointPublisher = node.create_publisher(
+        PointCloud,
+        WaypointsTopic,
+        10,
+    )
+
+    waypointCloud = CreateWaypointCloud(
+        waypoints
+    )
+
+    def PublishWaypointCloud():
+        waypointCloud.header.stamp = (
+            node.get_clock().now().to_msg()
+        )
+
+        waypointPublisher.publish(
+            waypointCloud
+        )
+
+    node.create_timer(
+        1.0,
+        PublishWaypointCloud,
+    )
+
+    return waypointPublisher
+
+
+# =============================================================================
+# Motion Planning
+# =============================================================================
+
+def ExecuteWaypointTrajectory(
+    moveItInstance,
+    armPlanningComponent,
+    waypoints: list[PoseStamped],
+    logger,
+):
+    """
+    Plan and execute each waypoint sequentially.
+
+    If planning fails, a small XYZ offset is applied and
+    planning is attempted again.
+    """
+
+    for waypointIndex, waypoint in enumerate(
+        waypoints
+    ):
+
+        logger.info(
+            f"Planning waypoint "
+            f"{waypointIndex + 1}/{len(waypoints)}"
+        )
+
+        armPlanningComponent.set_goal_state(
+            pose_stamped_msg=waypoint,
+            pose_link=ToolFrame,
+        )
+
+        planResult = (
+            armPlanningComponent.plan()
+        )
+
+        # ---------------------------------------------------------------------
+        # Retry with a small positional offset if planning fails.
+        # ---------------------------------------------------------------------
+
+        if not planResult:
+
+            logger.warn(
+                "Initial planning attempt failed. "
+                "Applying 1 mm XYZ offset and retrying."
+            )
+
+            waypoint.pose.position.x += 0.001
+            waypoint.pose.position.y += 0.001
+            waypoint.pose.position.z += 0.001
+
+            armPlanningComponent.set_goal_state(
+                pose_stamped_msg=waypoint,
+                pose_link=ToolFrame,
+            )
+
+            planResult = (
+                armPlanningComponent.plan()
+            )
+
+        # ---------------------------------------------------------------------
+        # Execute successful plan.
+        # ---------------------------------------------------------------------
+
+        if planResult:
+
+            logger.info(
+                f"Executing waypoint "
+                f"{waypointIndex + 1}/{len(waypoints)}"
+            )
+
+            robotTrajectory = (
+                planResult.trajectory
+            )
+
+            moveItInstance.execute(
+                robotTrajectory,
+                controllers=[],
+            )
+
+        else:
+            logger.error(
+                f"Planning failed for waypoint "
+                f"{waypointIndex + 1}."
+            )
+
+
+# =============================================================================
+# Main
+# =============================================================================
+
+def Main(args=None):
+    """
+    Application entry point.
+    """
+
+    logger = get_logger(
+        "cabinet_waypoint_generator"
+    )
+
+    # -------------------------------------------------------------------------
+    # Cabinet configuration
+    # -------------------------------------------------------------------------
+
+    initialDoorAngleDegrees = 20.0
+
+    cabinetPose = np.array(
+        [
+            -0.2,
+            0.4,
+            0.948,
+            0.0,
+            0.0,
+            -0.706825,
+            0.707388,
+        ]
+    )
+
+    cabinet = CreateCabinet(
+        logger
+    )
+
+    # -------------------------------------------------------------------------
+    # Initialize ROS 2
+    # -------------------------------------------------------------------------
+
+    rclpy.init(args=args)
+
+    # -------------------------------------------------------------------------
+    # Initialize MoveIt
+    # -------------------------------------------------------------------------
+
+    (
+        moveItInstance,
+        armPlanningComponent,
+    ) = CreateMoveItInstance(
+        logger
+    )
+
+    # -------------------------------------------------------------------------
+    # Create ROS node used for TF and waypoint publishing.
+    # -------------------------------------------------------------------------
+
+    waypointsNode = rclpy.create_node(
+        "waypoints_publisher"
+    )
+
+    # -------------------------------------------------------------------------
+    # Obtain required TF transforms.
+    # -------------------------------------------------------------------------
+
+    (
+        gripperToToolTransform,
+        robotBaseToWorldTransform,
+        tfListener,
+    ) = WaitForRequiredTransforms(
+        waypointsNode,
+        logger,
+    )
+
+    # -------------------------------------------------------------------------
+    # Generate cabinet corner transforms.
+    # -------------------------------------------------------------------------
+
+    cornerToWorldTransforms = (
+        CreateCabinetCornerTransforms(
+            cabinet,
+            cabinetPose,
+            initialDoorAngleDegrees,
+        )
+    )
+
+    # -------------------------------------------------------------------------
+    # Convert cabinet transforms to robot tool transforms.
+    # -------------------------------------------------------------------------
+
+    robotBaseToToolTransforms = (
+        CreateRobotToolTransforms(
+            cornerToWorldTransforms,
+            robotBaseToWorldTransform,
+            gripperToToolTransform,
+        )
+    )
+
+    # -------------------------------------------------------------------------
+    # Convert transforms into ROS waypoints.
+    # -------------------------------------------------------------------------
+
+    waypoints = CreateWaypoints(
+        robotBaseToToolTransforms
+    )
+
+    # -------------------------------------------------------------------------
+    # Start persistent waypoint visualization.
+    # -------------------------------------------------------------------------
+
+    CreateWaypointPublisher(
+        waypointsNode,
+        waypoints,
+    )
+
+    # -------------------------------------------------------------------------
+    # Execute robot trajectory.
+    # -------------------------------------------------------------------------
+
+    ExecuteWaypointTrajectory(
+        moveItInstance,
+        armPlanningComponent,
+        waypoints,
+        logger,
+    )
+
+    logger.info(
+        "Trajectory execution completed. "
+        "Waypoint publisher is running. "
+        "Press Ctrl+C to exit."
+    )
+
+    # -------------------------------------------------------------------------
+    # Keep waypoint publisher alive.
+    # -------------------------------------------------------------------------
 
     try:
-        rclpy.spin(waypoints_node)
+        rclpy.spin(
+            waypointsNode
+        )
+
     except KeyboardInterrupt:
         pass
+
     finally:
-        waypoints_node.destroy_node()
+        waypointsNode.destroy_node()
         rclpy.shutdown()
 
 
-if __name__=="__main__":
-    main()
+if __name__ == "__main__":
+    Main()
