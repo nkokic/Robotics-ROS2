@@ -4,7 +4,7 @@
   <name>robot_control</name>
   <version>0.0.0</version>
   <description>Robot control package for FT sensor nulling and peg-in-hole tasks</description>
-  <maintainer email="stjepan@todo.todo">stjepan</maintainer>
+  <maintainer email="nikola@todo.todo">nikola</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
