@@ -28,6 +28,7 @@
 #
 # Author: Denis Stogl
 
+from launch_ros.actions import Node
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, SetEnvironmentVariable
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -68,10 +69,19 @@ def launch_setup(context, *args, **kwargs):
             "launch_rviz": "true",
         }.items(),
     )
+    
+    spawn_hole = Node(
+        package="ur5_robotiq",
+        executable="spawn_hole_random",
+        name="spawn_hole",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+    )
 
     nodes_to_launch = [
         ur_control_launch,
         ur_moveit_launch,
+        spawn_hole,
     ]
 
     return nodes_to_launch

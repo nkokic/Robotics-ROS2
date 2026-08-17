@@ -1,11 +1,11 @@
-Za pokretanje simulacije:
+Pokretanje simulacije + stvaranje rupe:
     ros2 launch ur5_robotiq ur5_robot_sim_moveit.launch.py
 
-Za stvaranje utora:
+Samo stvaranje rupe:
     ros2 run ur5_robotiq spawn_hole_random
 
-Za nuliranje senzora:
+Nuliranje senzora:
     ros2 run robot_control sensor_nulling
 
-Za pokretanje rješenja:
+Stavljanje valjka u rupu:
     ros2 run robot_control put_peg_in_hole

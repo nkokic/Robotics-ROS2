@@ -13,8 +13,8 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='stjepan',
-    maintainer_email='stjepan@todo.todo',
+    maintainer='nikola',
+    maintainer_email='nikola@todo.todo',
     description='TODO: Package description',
     license='TODO: License declaration',
     extras_require={
@@ -24,8 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'sensor_nulling = robot_control.sensor_nulling:main',
-            'put_peg_in_hole = robot_control.put_peg_in_hole:main',
+            'sensor_nulling = robot_control.sensor_nulling:Main',
+            'put_peg_in_hole = robot_control.put_peg_in_hole:Main',
         ],
     },
 )
