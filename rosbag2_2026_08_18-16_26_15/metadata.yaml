@@ -2,13 +2,13 @@ rosbag2_bagfile_information:
   version: 9
   storage_identifier: mcap
   duration:
-    nanoseconds: 174000084755
+    nanoseconds: 408587184943
   starting_time:
-    nanoseconds_since_epoch: 1787054281333341576
-  message_count: 476
+    nanoseconds_since_epoch: 1787063183886015879
+  message_count: 4009
   topics_with_message_count:
     - topic_metadata:
-        name: /pozicija_cilja
+        name: /goal_position
         type: geometry_msgs/msg/Pose
         serialization_format: cdr
         offered_qos_profiles:
@@ -28,9 +28,9 @@ rosbag2_bagfile_information:
               nsec: 854775807
             avoid_ros_namespace_conventions: false
         type_description_hash: RIHS01_d501954e9476cea2996984e812054b68026ae0bfae789d9a10b23daf35cc90fa
-      message_count: 4
+      message_count: 10
     - topic_metadata:
-        name: /pozicija
+        name: /robot_position
         type: geometry_msgs/msg/Pose
         serialization_format: cdr
         offered_qos_profiles:
@@ -50,17 +50,17 @@ rosbag2_bagfile_information:
               nsec: 854775807
             avoid_ros_namespace_conventions: false
         type_description_hash: RIHS01_d501954e9476cea2996984e812054b68026ae0bfae789d9a10b23daf35cc90fa
-      message_count: 472
+      message_count: 3999
   compression_format: ""
   compression_mode: ""
   relative_file_paths:
-    - robot_cilj_0.mcap
+    - rosbag2_2026_08_18-16_26_15_0.mcap
   files:
-    - path: robot_cilj_0.mcap
+    - path: rosbag2_2026_08_18-16_26_15_0.mcap
       starting_time:
-        nanoseconds_since_epoch: 1787054281333341576
+        nanoseconds_since_epoch: 1787063183886015879
       duration:
-        nanoseconds: 174000084755
-      message_count: 476
+        nanoseconds: 408587184943
+      message_count: 4009
   custom_data: ~
   ros_distro: jazzy

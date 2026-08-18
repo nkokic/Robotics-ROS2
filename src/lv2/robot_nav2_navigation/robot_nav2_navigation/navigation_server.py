@@ -1,89 +1,317 @@
 #!/usr/bin/env python3
-from geometry_msgs.msg import PoseStamped, Pose
-from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
-import rclpy
-from rclpy.node import Node
-from rclpy.duration import Duration
+
+"""
+ROS 2 Nav2 waypoint navigator.
+
+Navigates the robot through a predefined sequence of waypoints.
+
+For every waypoint:
+    1. Publish the goal position on /goal_position.
+    2. Send the waypoint to Nav2.
+    3. Wait until navigation completes.
+    4. Report the navigation result.
+    5. Retry failed goals up to the configured retry limit.
+
+The code intentionally uses C#-style naming conventions:
+    - PascalCase for classes.
+    - camelCase for methods, fields, and local variables.
+"""
+
 import time
 
-waypoints = [
-    (2.389, 6.087, -0.001),
-    (11.332, 6.280, -0.001),
-    (21.297, 6.117, -0.001),
-    (21.324, -0.658, -0.001),
-    (17.281, -6.546, -0.001),
-    (8.809, -6.618, -0.001),
-    (0.438, -6.158, -0.001),
-    (-5.818, -3.079, -0.001),
-    (-5.804, 5.440, -0.001),
-    (1.082, 6.012, 0.002),
-    (2.389, 6.087, -0.001),
+import rclpy
+from geometry_msgs.msg import Pose, PoseStamped
+from nav2_simple_commander.robot_navigator import (
+    BasicNavigator,
+    TaskResult,
+)
+from rclpy.duration import Duration
+from rclpy.node import Node
+
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+WAYPOINTS = [
+    (0.0, 6.0, 0.0),    # 1
+    (12.0, 6.0, 0.0),   # 2
+    (12.0, 1.0, 0.0),   # 3
+    (20.0, 1.0, 0.0),   # 4
+    (20.0, 6.0, 0.0),   # 5
+    (22.0, 6.0, 0.0),   # 6
+    (22.0, -6.0, 0.0),   # 7
+    (9.5, -3.0, 0.0),   # 8
+    (-5.0, -4.0, 0.0),   # 9
+    (-5.0, 6.0, 0.0),   # 10
 ]
 
+MAP_FRAME = 'map'
+GOAL_TOPIC = 'goal_position'
+
+MAX_RETRIES = 3
+FEEDBACK_INTERVAL_SECONDS = 1.0
 
 
-def main(args=None):
-    rclpy.init(args=args)
-    # Wait for navigation to fully activate
-    navigator = BasicNavigator()
-    navigator.waitUntilNav2Active()
-    
-    # Create a separate node for publishing goal position
-    goal_publisher_node = Node('goal_position_publisher')
-    goal_publisher = goal_publisher_node.create_publisher(Pose, "pozicija_cilja", 10)
+class WaypointNavigator:
+    """
+    Controls navigation through a predefined sequence of waypoints.
 
-    for idx, point in enumerate(waypoints):
-        repeat_count = 0
-        
-        pose = Pose()
-        pose.position.x = point[0]
-        pose.position.y = point[1]
+    The class wraps Nav2's BasicNavigator and provides:
+        - Goal publishing.
+        - Pose creation.
+        - Navigation execution.
+        - Feedback reporting.
+        - Retry handling.
+    """
 
-        goal_publisher.publish(pose)
-        
-        while repeat_count < 6:
-            goal_pose = PoseStamped()
-            goal_pose.header.frame_id = 'map'
-            goal_pose.header.stamp = navigator.get_clock().now().to_msg()
-            goal_pose.pose.position.x = point[0]
-            goal_pose.pose.position.y = point[1]
-            goal_pose.pose.orientation.w = 1.0
-            goal_pose.pose.orientation.z = 0.0
-            #Activate action
-            navigator.goToPose(goal_pose)
-            while not navigator.isTaskComplete():
-                time.sleep(1)
-                # Feedback
-                feedback = navigator.getFeedback()
-                if feedback:
-                    print(
-                    'Estimated time of arrival: '
-                    + '{0:.0f}'.format(
-                        Duration.from_msg(feedback.estimated_time_remaining).nanoseconds
-                        / 1e9
-                    ) + ' seconds.'
-                )
-            # Fetch result
-            result = navigator.getResult()
+    def __init__(
+        self,
+        waypoints: list[tuple[float, float, float]]
+    ) -> None:
+        """
+        Initialize the waypoint navigator.
+
+        Args:
+            waypoints: Sequence of (x, y, z) waypoint coordinates.
+        """
+        self.waypoints = waypoints
+
+        self.navigator = BasicNavigator()
+
+        self.goalPublisherNode = Node(
+            'goal_position_publisher'
+        )
+
+        self.goalPublisher = (
+            self.goalPublisherNode.create_publisher(
+                Pose,
+                GOAL_TOPIC,
+                10
+            )
+        )
+
+    def start(self) -> None:
+        """Start navigation and process all configured waypoints."""
+        print('Waiting for Nav2 to become active...')
+
+        self.navigator.waitUntilNav2Active()
+
+        print('Nav2 is active.')
+        print(
+            f'Starting navigation through '
+            f'{len(self.waypoints)} waypoints.'
+        )
+
+        for waypointIndex, waypoint in enumerate(
+            self.waypoints
+        ):
+            self.navigateToWaypoint(
+                waypointIndex,
+                waypoint
+            )
+
+    def navigateToWaypoint(
+        self,
+        waypointIndex: int,
+        waypoint: tuple[float, float, float]
+    ) -> bool:
+        """
+        Navigate to a single waypoint.
+
+        Args:
+            waypointIndex: Zero-based waypoint index.
+            waypoint: Waypoint coordinates (x, y, z).
+
+        Returns:
+            True if the waypoint was reached successfully.
+            False if all attempts failed.
+        """
+        print(
+            f'\nNavigating to waypoint '
+            f'{waypointIndex}: '
+            f'({waypoint[0]:.3f}, {waypoint[1]:.3f})'
+        )
+
+        self.publishGoalPosition(waypoint)
+
+        retryCount = 0
+
+        while retryCount <= MAX_RETRIES:
+            goalPose = self.createGoalPose(waypoint)
+
+            print(
+                f'Sending waypoint {waypointIndex} '
+                f'to Nav2 '
+                f'(attempt {retryCount + 1}/'
+                f'{MAX_RETRIES + 1})...'
+            )
+
+            self.navigator.goToPose(goalPose)
+
+            result = self.waitForNavigation()
+
             if result == TaskResult.SUCCEEDED:
-                print(f'Goal {idx} succeeded!')
-                break
-            elif result == TaskResult.CANCELED:
-                print(f'Goal {idx} was canceled!')
-                break
-            elif result == TaskResult.FAILED:
-                print(f'Goal {idx} failed!')
-                if repeat_count < 3:
-                    print(f'Retrying goal {idx}...')
-                    repeat_count += 1
-            else:
-                print(f'Goal {idx} has an invalid return status!')
-                break
-    
-    # Cleanup
-    goal_publisher_node.destroy_node()
-    rclpy.shutdown()
-    exit(0)
+                print(
+                    f'✓ Goal {waypointIndex} succeeded!'
+                )
+                return True
 
-if __name__ == "__main__":
-    main()
+            if result == TaskResult.CANCELED:
+                print(
+                    f'⚠ Goal {waypointIndex} was canceled!'
+                )
+                return False
+
+            if result == TaskResult.FAILED:
+                print(
+                    f'✗ Goal {waypointIndex} failed!'
+                )
+
+                if retryCount < MAX_RETRIES:
+                    retryCount += 1
+
+                    print(
+                        f'Retrying goal {waypointIndex} '
+                        f'({retryCount}/{MAX_RETRIES})...'
+                    )
+
+                    continue
+
+                print(
+                    f'✗ Goal {waypointIndex} failed after '
+                    f'{MAX_RETRIES + 1} attempts.'
+                )
+
+                return False
+
+            print(
+                f'⚠ Goal {waypointIndex} returned an '
+                f'unknown navigation status.'
+            )
+
+            return False
+
+        return False
+
+    def waitForNavigation(self) -> TaskResult:
+        """
+        Wait until the current Nav2 task is complete.
+
+        While navigation is running, estimated time remaining
+        is printed periodically.
+
+        Returns:
+            The final Nav2 TaskResult.
+        """
+        while not self.navigator.isTaskComplete():
+            time.sleep(FEEDBACK_INTERVAL_SECONDS)
+
+            feedback = self.navigator.getFeedback()
+
+            if feedback is not None:
+                self.printNavigationFeedback(feedback)
+
+        return self.navigator.getResult()
+
+    @staticmethod
+    def printNavigationFeedback(feedback) -> None:
+        """Print the estimated navigation time remaining."""
+        remainingSeconds = (
+            Duration.from_msg(
+                feedback.estimated_time_remaining
+            ).nanoseconds
+            / 1e9
+        )
+
+        print(
+            'Estimated time of arrival: '
+            f'{remainingSeconds:.0f} seconds.'
+        )
+
+    def publishGoalPosition(
+        self,
+        waypoint: tuple[float, float, float]
+    ) -> None:
+        """
+        Publish the waypoint position on /goal_position.
+
+        This topic is separate from the Nav2 action and can be used
+        by other nodes or tools to visualize the currently selected
+        goal.
+        """
+        goalPosition = Pose()
+
+        goalPosition.position.x = waypoint[0]
+        goalPosition.position.y = waypoint[1]
+        goalPosition.position.z = waypoint[2]
+
+        # The original code did not set orientation on this message.
+        # Keep the same behavior here.
+
+        self.goalPublisher.publish(goalPosition)
+
+    def createGoalPose(
+        self,
+        waypoint: tuple[float, float, float]
+    ) -> PoseStamped:
+        """
+        Create a PoseStamped message for Nav2.
+
+        Args:
+            waypoint: Waypoint coordinates (x, y, z).
+
+        Returns:
+            A PoseStamped configured for the map frame.
+        """
+        goalPose = PoseStamped()
+
+        goalPose.header.frame_id = MAP_FRAME
+        goalPose.header.stamp = (
+            self.navigator.get_clock()
+            .now()
+            .to_msg()
+        )
+
+        goalPose.pose.position.x = waypoint[0]
+        goalPose.pose.position.y = waypoint[1]
+        goalPose.pose.position.z = waypoint[2]
+
+        # Identity orientation.
+        goalPose.pose.orientation.x = 0.0
+        goalPose.pose.orientation.y = 0.0
+        goalPose.pose.orientation.z = 0.0
+        goalPose.pose.orientation.w = 1.0
+
+        return goalPose
+
+    def shutdown(self) -> None:
+        """Release ROS 2 resources."""
+        self.goalPublisherNode.destroy_node()
+
+
+def main(args=None) -> int:
+    """Application entry point."""
+    rclpy.init(args=args)
+
+    waypointNavigator = WaypointNavigator(WAYPOINTS)
+
+    try:
+        waypointNavigator.start()
+        return 0
+
+    except KeyboardInterrupt:
+        print('\nNavigation interrupted by user.')
+        return 1
+
+    except Exception as exception:
+        print(f'Navigation error: {exception}')
+        return 1
+
+    finally:
+        waypointNavigator.shutdown()
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
