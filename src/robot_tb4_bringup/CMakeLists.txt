@@ -9,6 +9,11 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 
+install(PROGRAMS
+  scripts/wasd_teleop.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 install(DIRECTORY
 # Include all launch files which are located in launch directory in the package root.
   launch maps models

@@ -4,10 +4,8 @@
     <arg name="world" value="depot"/>
   </include>
 
-  
-
   <include file="$(find-pkg-share turtlebot4_navigation)/launch/localization.launch.py">
-    <arg name="map" value="$(find-pkg-share robot_tb4_bringup)/maps/my_map.yaml"/>
+    <arg name="map" value="$(find-pkg-share robot_tb4_bringup)/maps/map.yaml"/>
     <arg name="use_sim_time" value="true"/>
   </include>
 

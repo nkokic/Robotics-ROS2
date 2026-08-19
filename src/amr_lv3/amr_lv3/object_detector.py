@@ -21,12 +21,12 @@ class ObjectDetector(Node):
         self.bridge = CvBridge()
         
         # TF2 buffer and listener for coordinate transformations
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.tfBuffer = Buffer()
+        self.tfListener = TransformListener(self.tfBuffer, self)
         
         # Camera intrinsics (will be updated from camera_info)
-        self.camera_matrix = None
-        self.camera_frame = None
+        self.cameraMatrix = None
+        self.cameraFrame = None
         
         # Declare parameters for HSV thresholds (for yellow color detection)
         self.declare_parameter('hsv_lower', [20, 100, 100])
@@ -35,83 +35,83 @@ class ObjectDetector(Node):
         self.declare_parameter('min_area', 500.0)  # Minimum contour area to consider
         
         # Get parameters
-        hsv_lower = self.get_parameter('hsv_lower').value
-        hsv_upper = self.get_parameter('hsv_upper').value
-        self.target_frame = self.get_parameter('target_frame').value
-        self.min_area = self.get_parameter('min_area').value
+        hsvLower = self.get_parameter('hsv_lower').value
+        hsvUpper = self.get_parameter('hsv_upper').value
+        self.targetFrame = self.get_parameter('target_frame').value
+        self.minArea = self.get_parameter('min_area').value
         
-        self.hsv_lower = np.array(hsv_lower)
-        self.hsv_upper = np.array(hsv_upper)
+        self.hsvLower = np.array(hsvLower)
+        self.hsvUpper = np.array(hsvUpper)
         
         # Subscribe to camera info
-        self.camera_info_sub = self.create_subscription(
+        self.cameraInfoSub = self.create_subscription(
             CameraInfo,
             '/oakd/rgb/preview/camera_info',
-            self.camera_info_callback,
+            self.CameraInfoCallback,
             10
         )
         
         # Create synchronized subscribers for RGB and Depth images
         # Using uncompressed image since OAK-D publishes on /image_raw not /compressed
-        self.rgb_sub = message_filters.Subscriber(
+        self.rgbSub = message_filters.Subscriber(
             self,
             Image,
             '/oakd/rgb/preview/image_raw'
         )
         
-        self.depth_sub = message_filters.Subscriber(
+        self.depthSub = message_filters.Subscriber(
             self,
             Image,
             '/oakd/rgb/preview/depth'
         )
         
         # Synchronize the messages
-        self.ts = message_filters.ApproximateTimeSynchronizer(
-            [self.rgb_sub, self.depth_sub],
+        self.timeSynchronizer = message_filters.ApproximateTimeSynchronizer(
+            [self.rgbSub, self.depthSub],
             queue_size=10,
             slop=0.1
         )
-        self.ts.registerCallback(self.synchronized_callback)
+        self.timeSynchronizer.registerCallback(self.SynchronizedCallback)
         
         # Publisher for detected object position in map frame
-        self.object_point_pub = self.create_publisher(
+        self.objectPointPub = self.create_publisher(
             Point,
             '/detected_object_point',
             10
         )
         
         # Publisher for binary mask visualization
-        self.mask_pub = self.create_publisher(
+        self.maskPub = self.create_publisher(
             Image,
             '/object_detector/mask',
             10
         )
         
         # Publisher for visualization (optional - debug image)
-        self.debug_image_pub = self.create_publisher(
+        self.debugImagePub = self.create_publisher(
             CompressedImage,
             '/object_detector/debug_image/compressed',
             10
         )
         
         self.get_logger().info('Object Detector initialized')
-        self.get_logger().info(f'HSV Lower: {self.hsv_lower}')
-        self.get_logger().info(f'HSV Upper: {self.hsv_upper}')
-        self.get_logger().info(f'Target frame: {self.target_frame}')
+        self.get_logger().info(f'HSV Lower: {self.hsvLower}')
+        self.get_logger().info(f'HSV Upper: {self.hsvUpper}')
+        self.get_logger().info(f'Target frame: {self.targetFrame}')
     
-    def camera_info_callback(self, msg):
+    def CameraInfoCallback(self, msg):
         """Process camera info to extract intrinsic parameters"""
-        if self.camera_matrix is None:
+        if self.cameraMatrix is None:
             # Extract camera matrix (K)
-            K = np.array(msg.k).reshape(3, 3)
-            self.camera_matrix = K
-            self.camera_frame = msg.header.frame_id
+            cameraMatrix = np.array(msg.k).reshape(3, 3)
+            self.cameraMatrix = cameraMatrix
+            self.cameraFrame = msg.header.frame_id
             
-            self.get_logger().info(f'Camera matrix received from frame: {self.camera_frame}')
-            self.get_logger().info(f'fx: {K[0,0]:.2f}, fy: {K[1,1]:.2f}')
-            self.get_logger().info(f'cx: {K[0,2]:.2f}, cy: {K[1,2]:.2f}')
+            self.get_logger().info(f'Camera matrix received from frame: {self.cameraFrame}')
+            self.get_logger().info(f'fx: {cameraMatrix[0,0]:.2f}, fy: {cameraMatrix[1,1]:.2f}')
+            self.get_logger().info(f'cx: {cameraMatrix[0,2]:.2f}, cy: {cameraMatrix[1,2]:.2f}')
     
-    def detect_yellow_object(self, rgb_image):
+    def DetectYellowObject(self, rgbImage):
         """
         Detect yellow object using HSV color space and connected components analysis
         
@@ -126,10 +126,10 @@ class ObjectDetector(Node):
         Returns: centroid (x, y) or None if no object detected
         """
         # Step 1: Convert BGR to HSV color space
-        hsv = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2HSV)
+        hsv = cv2.cvtColor(rgbImage, cv2.COLOR_BGR2HSV)
         
         # Step 2: Create binary mask for yellow color using HSV threshold
-        mask = cv2.inRange(hsv, self.hsv_lower, self.hsv_upper)
+        mask = cv2.inRange(hsv, self.hsvLower, self.hsvUpper)
         
         # Step 3: Morphological operations to reduce noise
         kernel = np.ones((5, 5), np.uint8)
@@ -143,130 +143,130 @@ class ObjectDetector(Node):
             return None, mask
         
         # Step 5: Select the largest connected component
-        largest_contour = max(contours, key=cv2.contourArea)
-        area = cv2.contourArea(largest_contour)
+        largestContour = max(contours, key=cv2.contourArea)
+        area = cv2.contourArea(largestContour)
         
         # Filter out components that are too small
-        if area < self.min_area:
-            self.get_logger().debug(f'Contour area {area} too small (min: {self.min_area})')
+        if area < self.minArea:
+            self.get_logger().debug(f'Contour area {area} too small (min: {self.minArea})')
             return None, mask
         
         # Step 6: Calculate centroid using image moments
-        M = cv2.moments(largest_contour)
+        moments = cv2.moments(largestContour)
         
-        if M['m00'] == 0:
+        if moments['m00'] == 0:
             return None, mask
         
         # Centroid formula: cx = M10/M00, cy = M01/M00
-        cx = int(M['m10'] / M['m00'])
-        cy = int(M['m01'] / M['m00'])
+        cx = int(moments['m10'] / moments['m00'])
+        cy = int(moments['m01'] / moments['m00'])
         
         # Log the contour area
         self.get_logger().info(f'Largest yellow contour area: {area:.1f} pixels')
         
         return (cx, cy), mask
     
-    def project_to_3d(self, u, v, depth_image):
+    def ProjectTo3D(self, u, v, depthImage):
         """
         Project 2D pixel coordinates to 3D camera coordinates
         u, v: pixel coordinates
-        depth_image: depth image in meters
+        depthImage: depth image in meters
         Returns: (x, y, z) in camera frame or None
         """
-        if self.camera_matrix is None:
+        if self.cameraMatrix is None:
             self.get_logger().warn('Camera matrix not yet received')
             return None
         
         # Get depth value at pixel location
-        h, w = depth_image.shape[:2]
+        height, width = depthImage.shape[:2]
         
-        if u < 0 or u >= w or v < 0 or v >= h:
+        if u < 0 or u >= width or v < 0 or v >= height:
             self.get_logger().warn(f'Pixel coordinates out of bounds: ({u}, {v})')
             return None
         
         # Get depth value at pixel
-        depth_raw = depth_image[v, u]
-        self.get_logger().info(f'Raw depth value at ({u}, {v}): {depth_raw}')
+        depthRaw = depthImage[v, u]
+        self.get_logger().info(f'Raw depth value at ({u}, {v}): {depthRaw}')
         
         # OAK-D depth is typically in millimeters, convert to meters
-        Z = depth_raw
+        z = depthRaw
         
-        if Z == 0 or np.isnan(Z) or np.isinf(Z):
-            self.get_logger().warn(f'Invalid depth value at ({u}, {v}): raw={depth_raw}, Z={Z}m')
+        if z == 0 or np.isnan(z) or np.isinf(z):
+            self.get_logger().warn(f'Invalid depth value at ({u}, {v}): raw={depthRaw}, Z={z}m')
             return None
         
-        self.get_logger().info(f'Depth Z: {Z:.3f}m')
+        self.get_logger().info(f'Depth Z: {z:.3f}m')
         
         # Extract camera intrinsics
-        fx = self.camera_matrix[0, 0]
-        fy = self.camera_matrix[1, 1]
-        cx = self.camera_matrix[0, 2]
-        cy = self.camera_matrix[1, 2]
+        fx = self.cameraMatrix[0, 0]
+        fy = self.cameraMatrix[1, 1]
+        cx = self.cameraMatrix[0, 2]
+        cy = self.cameraMatrix[1, 2]
         
         # Project to 3D
-        X = (u - cx) * Z / fx
-        Y = (v - cy) * Z / fy
+        x = (u - cx) * z / fx
+        y = (v - cy) * z / fy
         
-        return (X, Y, Z)
+        return (x, y, z)
     
-    def transform_to_map(self, point_camera, timestamp):
+    def TransformToMap(self, pointCamera, timestamp):
         """
         Transform point from camera frame to map frame using TF
-        point_camera: (x, y, z) tuple in camera frame
+        pointCamera: (x, y, z) tuple in camera frame
         timestamp: time of the measurement
         Returns: Point in map frame or None
         """
-        if self.camera_frame is None:
+        if self.cameraFrame is None:
             self.get_logger().warn('Camera frame not yet known')
             return None
         
         try:
             # Create PointStamped in camera frame
-            point_stamped = PointStamped()
-            point_stamped.header.frame_id = self.camera_frame
-            point_stamped.header.stamp = timestamp
-            point_stamped.point.x = point_camera[0]
-            point_stamped.point.y = point_camera[1]
-            point_stamped.point.z = point_camera[2]
+            pointStamped = PointStamped()
+            pointStamped.header.frame_id = self.cameraFrame
+            pointStamped.header.stamp = timestamp
+            pointStamped.point.x = pointCamera[0]
+            pointStamped.point.y = pointCamera[1]
+            pointStamped.point.z = pointCamera[2]
             
             # Get transform from camera frame to target frame
-            transform = self.tf_buffer.lookup_transform(
-                self.target_frame,
-                self.camera_frame,
+            transform = self.tfBuffer.lookup_transform(
+                self.targetFrame,
+                self.cameraFrame,
                 timestamp,
                 timeout=rclpy.duration.Duration(seconds=1.0)
             )
             
             # Transform point
-            point_transformed = do_transform_point(point_stamped, transform)
+            pointTransformed = do_transform_point(pointStamped, transform)
             
-            return point_transformed.point
+            return pointTransformed.point
             
         except (tf2_ros.LookupException, 
                 tf2_ros.ConnectivityException, 
-                tf2_ros.ExtrapolationException) as e:
-            self.get_logger().warn(f'TF transform failed: {str(e)}')
+                tf2_ros.ExtrapolationException) as exception:
+            self.get_logger().warn(f'TF transform failed: {str(exception)}')
             return None
     
-    def synchronized_callback(self, rgb_msg, depth_msg):
+    def SynchronizedCallback(self, rgbMsg, depthMsg):
         """Process synchronized RGB and depth images"""
         try:
             # Convert uncompressed RGB image to OpenCV format
-            rgb_image = self.bridge.imgmsg_to_cv2(rgb_msg, desired_encoding='bgr8')
+            rgbImage = self.bridge.imgmsg_to_cv2(rgbMsg, desired_encoding='bgr8')
             
-            if rgb_image is None:
+            if rgbImage is None:
                 self.get_logger().error('Failed to decode RGB image')
                 return
             
             # Convert depth image to OpenCV format
-            depth_image = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding='passthrough')
+            depthImage = self.bridge.imgmsg_to_cv2(depthMsg, desired_encoding='passthrough')
             
             # Detect yellow object
-            centroid, mask = self.detect_yellow_object(rgb_image)
+            centroid, mask = self.DetectYellowObject(rgbImage)
             
             # Publish mask for visualization (always publish, even if no object detected)
             if mask is not None:
-                self.publish_mask(mask, rgb_msg.header.stamp)
+                self.PublishMask(mask, rgbMsg.header.stamp)
             
             if centroid is None:
                 return
@@ -275,71 +275,71 @@ class ObjectDetector(Node):
             self.get_logger().info(f'Yellow object detected at pixel: ({u}, {v})')
             
             # Project to 3D in camera frame
-            point_3d_camera = self.project_to_3d(u, v, depth_image)
+            point3dCamera = self.ProjectTo3D(u, v, depthImage)
             
-            if point_3d_camera is None:
+            if point3dCamera is None:
                 self.get_logger().warn('Failed to project to 3D - check depth value')
                 return
             
             self.get_logger().info(f'3D point in camera frame: '
-                                   f'X={point_3d_camera[0]:.3f}, '
-                                   f'Y={point_3d_camera[1]:.3f}, '
-                                   f'Z={point_3d_camera[2]:.3f}')
+                                   f'X={point3dCamera[0]:.3f}, '
+                                   f'Y={point3dCamera[1]:.3f}, '
+                                   f'Z={point3dCamera[2]:.3f}')
             
             # Transform to map frame
-            point_map = self.transform_to_map(point_3d_camera, rgb_msg.header.stamp)
+            pointMap = self.TransformToMap(point3dCamera, rgbMsg.header.stamp)
             
-            if point_map is None:
+            if pointMap is None:
                 self.get_logger().warn('Failed to transform to map frame - check TF')
                 return
             
-            self.get_logger().info(f'3D point in {self.target_frame} frame: '
-                                   f'X={point_map.x:.3f}, '
-                                   f'Y={point_map.y:.3f}, '
-                                   f'Z={point_map.z:.3f}')
+            self.get_logger().info(f'3D point in {self.targetFrame} frame: '
+                                   f'X={pointMap.x:.3f}, '
+                                   f'Y={pointMap.y:.3f}, '
+                                   f'Z={pointMap.z:.3f}')
             
             # Publish the point
-            self.object_point_pub.publish(point_map)
+            self.objectPointPub.publish(pointMap)
             
             # Optional: Publish debug image with detection visualization
-            self.publish_debug_image(rgb_image, centroid, mask)
+            self.PublishDebugImage(rgbImage, centroid, mask)
             
-        except Exception as e:
-            self.get_logger().error(f'Error in synchronized callback: {str(e)}')
+        except Exception as exception:
+            self.get_logger().error(f'Error in synchronized callback: {str(exception)}')
     
-    def publish_debug_image(self, rgb_image, centroid, mask):
+    def PublishDebugImage(self, rgbImage, centroid, mask):
         """Publish debug image showing detection"""
         try:
             # Create debug image
-            debug_img = rgb_image.copy()
+            debugImg = rgbImage.copy()
             
             # Draw centroid
-            cv2.circle(debug_img, centroid, 10, (0, 0, 255), -1)
-            cv2.circle(debug_img, centroid, 20, (0, 255, 0), 2)
+            cv2.circle(debugImg, centroid, 10, (0, 0, 255), -1)
+            cv2.circle(debugImg, centroid, 20, (0, 255, 0), 2)
             
             # Add text
             text = f'Object at ({centroid[0]}, {centroid[1]})'
-            cv2.putText(debug_img, text, (centroid[0] + 25, centroid[1]), 
+            cv2.putText(debugImg, text, (centroid[0] + 25, centroid[1]), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
             # Overlay mask
-            mask_colored = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-            debug_img = cv2.addWeighted(debug_img, 0.7, mask_colored, 0.3, 0)
+            maskColored = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+            debugImg = cv2.addWeighted(debugImg, 0.7, maskColored, 0.3, 0)
             
             # Convert to compressed image
-            _, buffer = cv2.imencode('.jpg', debug_img)
-            compressed_msg = CompressedImage()
-            compressed_msg.header.stamp = self.get_clock().now().to_msg()
-            compressed_msg.header.frame_id = 'camera'
-            compressed_msg.format = 'jpeg'
-            compressed_msg.data = buffer.tobytes()
+            _, buffer = cv2.imencode('.jpg', debugImg)
+            compressedMsg = CompressedImage()
+            compressedMsg.header.stamp = self.get_clock().now().to_msg()
+            compressedMsg.header.frame_id = 'camera'
+            compressedMsg.format = 'jpeg'
+            compressedMsg.data = buffer.tobytes()
             
-            self.debug_image_pub.publish(compressed_msg)
+            self.debugImagePub.publish(compressedMsg)
             
-        except Exception as e:
-            self.get_logger().debug(f'Error publishing debug image: {str(e)}')
+        except Exception as exception:
+            self.get_logger().debug(f'Error publishing debug image: {str(exception)}')
     
-    def publish_mask(self, mask, timestamp):
+    def PublishMask(self, mask, timestamp):
         """
         Publish binary mask as visible image.
         Binary mask (0 or 255) from cv2.inRange is published as mono8 image.
@@ -350,15 +350,15 @@ class ObjectDetector(Node):
                 return
             
             # Convert to ROS Image message
-            mask_msg = self.bridge.cv2_to_imgmsg(mask, encoding='mono8')
-            mask_msg.header.stamp = timestamp
-            mask_msg.header.frame_id = self.camera_frame if self.camera_frame else 'camera'
+            maskMsg = self.bridge.cv2_to_imgmsg(mask, encoding='mono8')
+            maskMsg.header.stamp = timestamp
+            maskMsg.header.frame_id = self.cameraFrame if self.cameraFrame else 'camera'
             
             # Publish
-            self.mask_pub.publish(mask_msg)
+            self.maskPub.publish(maskMsg)
             
-        except Exception as e:
-            self.get_logger().error(f'Error publishing mask: {str(e)}')
+        except Exception as exception:
+            self.get_logger().error(f'Error publishing mask: {str(exception)}')
 
 
 def main(args=None):
