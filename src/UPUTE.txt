@@ -1,0 +1,9 @@
+Za pokretanje simulacije te postavljanje robota u okruženje
+    ros2 launch robot_tb4_bringup rob_manip.launch.xml
+Potrebno je odrediti "2D Pose Estimate" nakon što se sve pokretanje
+
+Za prikupljanje točaka pomoću "Publish Point" pokrenuti sljedeću launch datoteku
+    ros2 launch amr_lv3 gather_patrol_points.launch.py max_points:=5 output_file:=patrol_points.yaml
+
+Za pokretanje patroliranja te detekcije zelenog objekta pokrenuti sljedeću launch datoteku 
+    ros2 launch amr_lv3 patrol_with_object_detection.launch.py input_file:=./src/lv3/amr_lv3/patrol_points.yaml safe_distance:=1.0 wait_time:=3.0

@@ -1,0 +1,27 @@
+<launch>
+  <include file="$(find-pkg-share turtlebot4_gz_bringup)/launch/turtlebot4_gz.launch.py">
+    <arg name="model" value="lite"/>
+    <arg name="world" value="depot"/>
+  </include>
+
+  
+
+  <include file="$(find-pkg-share turtlebot4_navigation)/launch/localization.launch.py">
+    <arg name="map" value="$(find-pkg-share robot_tb4_bringup)/maps/my_map.yaml"/>
+    <arg name="use_sim_time" value="true"/>
+  </include>
+
+  <include file="$(find-pkg-share turtlebot4_navigation)/launch/nav2.launch.py">
+    <arg name="use_sim_time" value="true"/>
+  </include>
+
+  <include file="$(find-pkg-share turtlebot4_viz)/launch/view_navigation.launch.py"/>
+
+  <!-- Spawn green box model -->
+  <node pkg="ros_gz_sim" exec="create" name="spawn_green_box" output="screen"
+        args="-file $(find-pkg-share robot_tb4_bringup)/models/green_box/model.sdf 
+              -name green_box 
+              -x -6.02 
+              -y -6.07 
+              -z 0.5"/>
+</launch>
