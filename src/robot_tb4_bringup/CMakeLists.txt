@@ -16,7 +16,7 @@ install(PROGRAMS
 
 install(DIRECTORY
 # Include all launch files which are located in launch directory in the package root.
-  launch maps models
+  launch maps models config
 DESTINATION share/${PROJECT_NAME}/
 )
 

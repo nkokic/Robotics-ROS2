@@ -8,14 +8,14 @@ def generate_launch_description():
     # Declare launch arguments
     hsv_lower_arg = DeclareLaunchArgument(
         'hsv_lower',
-        default_value='[40, 100, 100]',
-        description='HSV lower bounds for green detection [H, S, V]'
+        default_value='[80, 100, 100]',
+        description='HSV lower bounds for cyan detection [H, S, V]'
     )
     
     hsv_upper_arg = DeclareLaunchArgument(
         'hsv_upper',
-        default_value='[80, 255, 255]',
-        description='HSV upper bounds for green detection [H, S, V]'
+        default_value='[100, 255, 255]',
+        description='HSV upper bounds for cyan detection [H, S, V]'
     )
     
     target_frame_arg = DeclareLaunchArgument(

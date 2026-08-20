@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import rclpy
+from rclpy.duration import Duration
 from rclpy.node import Node
+from rclpy.time import Time
 from sensor_msgs.msg import Image, CompressedImage, CameraInfo
 from geometry_msgs.msg import Point, PointStamped
 from cv_bridge import CvBridge
@@ -28,9 +30,9 @@ class ObjectDetector(Node):
         self.cameraMatrix = None
         self.cameraFrame = None
         
-        # Declare parameters for HSV thresholds (for yellow color detection)
-        self.declare_parameter('hsv_lower', [20, 100, 100])
-        self.declare_parameter('hsv_upper', [30, 255, 255])
+        # OpenCV cyan hue is approximately 90 on its 0-179 hue scale.
+        self.declare_parameter('hsv_lower', [80, 100, 100])
+        self.declare_parameter('hsv_upper', [100, 255, 255])
         self.declare_parameter('target_frame', 'map')
         self.declare_parameter('min_area', 500.0)  # Minimum contour area to consider
         
@@ -99,21 +101,21 @@ class ObjectDetector(Node):
         self.get_logger().info(f'HSV Upper: {self.hsvUpper}')
         self.get_logger().info(f'Target frame: {self.targetFrame}')
     
-    def CameraInfoCallback(self, msg):
+    def CameraInfoCallback(self, message):
         """Process camera info to extract intrinsic parameters"""
         if self.cameraMatrix is None:
             # Extract camera matrix (K)
-            cameraMatrix = np.array(msg.k).reshape(3, 3)
+            cameraMatrix = np.array(message.k).reshape(3, 3)
             self.cameraMatrix = cameraMatrix
-            self.cameraFrame = msg.header.frame_id
+            self.cameraFrame = message.header.frame_id
             
             self.get_logger().info(f'Camera matrix received from frame: {self.cameraFrame}')
             self.get_logger().info(f'fx: {cameraMatrix[0,0]:.2f}, fy: {cameraMatrix[1,1]:.2f}')
             self.get_logger().info(f'cx: {cameraMatrix[0,2]:.2f}, cy: {cameraMatrix[1,2]:.2f}')
     
-    def DetectYellowObject(self, rgbImage):
+    def DetectCyanObject(self, rgbImage):
         """
-        Detect yellow object using HSV color space and connected components analysis
+        Detect a cyan object using HSV color space and connected components analysis.
         
         Method:
         1. Convert RGB to HSV color space
@@ -126,10 +128,10 @@ class ObjectDetector(Node):
         Returns: centroid (x, y) or None if no object detected
         """
         # Step 1: Convert BGR to HSV color space
-        hsv = cv2.cvtColor(rgbImage, cv2.COLOR_BGR2HSV)
+        hsvImage = cv2.cvtColor(rgbImage, cv2.COLOR_BGR2HSV)
         
-        # Step 2: Create binary mask for yellow color using HSV threshold
-        mask = cv2.inRange(hsv, self.hsvLower, self.hsvUpper)
+        # Step 2: Create a binary mask for cyan using the HSV threshold.
+        mask = cv2.inRange(hsvImage, self.hsvLower, self.hsvUpper)
         
         # Step 3: Morphological operations to reduce noise
         kernel = np.ones((5, 5), np.uint8)
@@ -137,7 +139,12 @@ class ObjectDetector(Node):
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)   # Remove small noise
         
         # Step 4: Find connected components (contours) in binary image
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, ignoredHierarchy = cv2.findContours(
+            mask,
+            cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_SIMPLE
+        )
+        del ignoredHierarchy
         
         if not contours:
             return None, mask
@@ -162,7 +169,7 @@ class ObjectDetector(Node):
         cy = int(moments['m01'] / moments['m00'])
         
         # Log the contour area
-        self.get_logger().info(f'Largest yellow contour area: {area:.1f} pixels')
+        self.get_logger().info(f'Largest cyan contour area: {area:.1f} pixels')
         
         return (cx, cy), mask
     
@@ -230,12 +237,23 @@ class ObjectDetector(Node):
             pointStamped.point.z = pointCamera[2]
             
             # Get transform from camera frame to target frame
-            transform = self.tfBuffer.lookup_transform(
-                self.targetFrame,
-                self.cameraFrame,
-                timestamp,
-                timeout=rclpy.duration.Duration(seconds=1.0)
-            )
+            try:
+                transform = self.tfBuffer.lookup_transform(
+                    self.targetFrame,
+                    self.cameraFrame,
+                    timestamp,
+                    timeout=Duration(seconds=0.25)
+                )
+            except tf2_ros.ExtrapolationException:
+                # Camera frames can arrive slightly ahead of the latest TF.
+                # Use the newest complete transform instead of dropping an
+                # otherwise valid detection.
+                transform = self.tfBuffer.lookup_transform(
+                    self.targetFrame,
+                    self.cameraFrame,
+                    Time(),
+                    timeout=Duration(seconds=0.25)
+                )
             
             # Transform point
             pointTransformed = do_transform_point(pointStamped, transform)
@@ -261,8 +279,8 @@ class ObjectDetector(Node):
             # Convert depth image to OpenCV format
             depthImage = self.bridge.imgmsg_to_cv2(depthMsg, desired_encoding='passthrough')
             
-            # Detect yellow object
-            centroid, mask = self.DetectYellowObject(rgbImage)
+            # Detect cyan object
+            centroid, mask = self.DetectCyanObject(rgbImage)
             
             # Publish mask for visualization (always publish, even if no object detected)
             if mask is not None:
@@ -272,7 +290,7 @@ class ObjectDetector(Node):
                 return
             
             u, v = centroid
-            self.get_logger().info(f'Yellow object detected at pixel: ({u}, {v})')
+            self.get_logger().info(f'Cyan object detected at pixel: ({u}, {v})')
             
             # Project to 3D in camera frame
             point3dCamera = self.ProjectTo3D(u, v, depthImage)
@@ -327,12 +345,16 @@ class ObjectDetector(Node):
             debugImg = cv2.addWeighted(debugImg, 0.7, maskColored, 0.3, 0)
             
             # Convert to compressed image
-            _, buffer = cv2.imencode('.jpg', debugImg)
+            encodingSucceeded, encodedImage = cv2.imencode('.jpg', debugImg)
+            if not encodingSucceeded:
+                self.get_logger().warn('Failed to encode debug image')
+                return
+
             compressedMsg = CompressedImage()
             compressedMsg.header.stamp = self.get_clock().now().to_msg()
             compressedMsg.header.frame_id = 'camera'
             compressedMsg.format = 'jpeg'
-            compressedMsg.data = buffer.tobytes()
+            compressedMsg.data = encodedImage.tobytes()
             
             self.debugImagePub.publish(compressedMsg)
             
@@ -371,7 +393,8 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

@@ -1,11 +1,21 @@
 <launch>
+  <!-- ROS_LOCALHOST_ONLY is deprecated in Jazzy and overrides the discovery
+       range below when inherited from the user's shell. Subnet discovery is
+       required here because this launch starts many independent processes. -->
+  <unset_env name="ROS_LOCALHOST_ONLY"/>
+  <set_env name="ROS_AUTOMATIC_DISCOVERY_RANGE" value="SUBNET"/>
+
   <include file="$(find-pkg-share turtlebot4_gz_bringup)/launch/turtlebot4_gz.launch.py">
     <arg name="model" value="lite"/>
     <arg name="world" value="depot"/>
+    <arg name="x" value="0.0"/>
+    <arg name="y" value="0.0"/>
+    <arg name="yaw" value="0.0"/>
   </include>
 
   <include file="$(find-pkg-share turtlebot4_navigation)/launch/localization.launch.py">
     <arg name="map" value="$(find-pkg-share robot_tb4_bringup)/maps/map.yaml"/>
+    <arg name="params" value="$(find-pkg-share robot_tb4_bringup)/config/localization.yaml"/>
     <arg name="use_sim_time" value="true"/>
   </include>
 
@@ -15,11 +25,11 @@
 
   <include file="$(find-pkg-share turtlebot4_viz)/launch/view_navigation.launch.py"/>
 
-  <!-- Spawn green box model -->
-  <node pkg="ros_gz_sim" exec="create" name="spawn_green_box" output="screen"
-        args="-file $(find-pkg-share robot_tb4_bringup)/models/green_box/model.sdf 
-              -name green_box 
-              -x -6.02 
-              -y -6.07 
+  <!-- Spawn cyan cylinder model -->
+  <node pkg="ros_gz_sim" exec="create" name="spawn_cyan_cylinder" output="screen"
+        args="-file $(find-pkg-share robot_tb4_bringup)/models/cyan_cylinder/model.sdf
+              -name cyan_cylinder
+              -x -7.0
+              -y 6.0
               -z 0.5"/>
 </launch>

@@ -30,7 +30,6 @@ def generate_launch_description():
     patrolling_point_navigator_node = Node(
         package='amr_lv3',
         executable='patrolling_point_navigator',
-        name='patrolling_point_navigator',
         output='screen',
         parameters=[{
             'input_file': LaunchConfiguration('input_file'),
