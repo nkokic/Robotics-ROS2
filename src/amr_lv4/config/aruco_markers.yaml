@@ -1,0 +1,43 @@
+# ArUco markeri - generirano pomocu collect_marker_poses.py
+# DICT_4X4_50, velicina 0.2m
+markers:
+  - id: 1
+    x: 12.035
+    y: -4.012
+    z: 0.35
+    roll: 1.5708
+    pitch: 0.0
+    yaw: -1.5706
+
+  - id: 5
+    x: 7.102
+    y: -0.252
+    z: 0.35
+    roll: 1.5708
+    pitch: 0.0
+    yaw: 0.0002
+
+  - id: 10
+    x: 4.787
+    y: -9.763
+    z: 0.35
+    roll: 1.5708
+    pitch: 0.0
+    yaw: -3.1414
+
+  - id: 15
+    x: -5.014
+    y: -9.756
+    z: 0.35
+    roll: 1.5708
+    pitch: 0.0
+    yaw: 0.0115
+
+  - id: 20
+    x: -2.162
+    y: -3.012
+    z: 0.35
+    roll: 1.5708
+    pitch: 0.0
+    yaw: -3.1294
+

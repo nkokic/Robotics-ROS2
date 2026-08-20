@@ -1,12 +1,20 @@
-Pokretanje simulacije robota:
-    ros2 launch robot_tb4_bringup rob_manip.launch.xml
+Pokretanje simulacije i navigacije:
+    ros2 launch amr_lv4 rosbot_nav.launch.py
 
-Zbog toga što se uvijek instancira na sredinu mape, dana je početna poza te nije potrebno stavljati 2D pose estimate.
-Ponekad ne radi iz prve te je potreban restart.
+Prikupljanje točaka:
+    ros2 launch amr_lv4 gather_points.launch.py max_points:=5 output_file:=./src/lv4/amr_lv4/patrol_points.yaml
 
+Obilazak točaka:
+    ros2 launch amr_lv4 patrol_navigator.launch.py input_file:=./src/lv4/amr_lv4/patrol_points.yaml
 
-Postavljanje () patrolnih točaka s "Publish Point":
-    ros2 launch amr_lv3 gather_patrol_points.launch.py max_points:=4 output_file:=patrol_points.yaml
+Prikupljanje položaja markera:
+    ros2 run amr_lv4 collect_marker_poses
 
-Patrola i detekcija zelenog objekta: 
-    ros2 launch amr_lv3 patrol_with_object_detection.launch.py input_file:=./src/amr_lv3/patrol_points.yaml safe_distance:=1.0 wait_time:=3.0
+Stvaranje markera:
+    ros2 launch amr_lv4 spawn_aruco_markers.launch.py
+
+Obilazak točaka i traženje aruco markera:
+    ros2 run amr_lv4 aruco_patrol --ros-args \
+        -p patrol_file:=/home/Robotics-ROS2/src/amr_lv4/patrol_points.yaml \
+        -p wait_time:=5.0 \
+        -p stop_distance:=1.0
