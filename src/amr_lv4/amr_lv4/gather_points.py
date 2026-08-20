@@ -13,11 +13,11 @@ class PatrollingPointGatherer(Node):
         
         # Declare and get parameter for maximum number of points
         self.declare_parameter('max_points', 5)
-        self.max_points = self.get_parameter('max_points').value
+        self.maxPoints = self.get_parameter('max_points').value
         
         # Declare parameter for output file path
         self.declare_parameter('output_file', 'patrol_points.yaml')
-        self.output_file = self.get_parameter('output_file').value
+        self.outputFile = self.get_parameter('output_file').value
         
         # List to store points
         self.points = []
@@ -26,42 +26,46 @@ class PatrollingPointGatherer(Node):
         self.subscription = self.create_subscription(
             PointStamped,
             '/clicked_point',
-            self.clicked_point_callback,
+            self.ClickedPointCallback,
             10
         )
         
-        self.get_logger().info(f'Patrolling Point Gatherer started. Max points: {self.max_points}')
-        self.get_logger().info(f'Click points in RViz. Points will be saved to: {self.output_file}')
+        self.get_logger().info(f'Patrolling Point Gatherer started. Max points: {self.maxPoints}')
+        self.get_logger().info(f'Click points in RViz. Points will be saved to: {self.outputFile}')
     
-    def clicked_point_callback(self, msg):
-        if len(self.points) < self.max_points:
-            point_data = {
+    def ClickedPointCallback(self, msg):
+        if len(self.points) < self.maxPoints:
+            pointData = {
                 'x': msg.point.x,
                 'y': msg.point.y,
                 'z': msg.point.z
             }
-            self.points.append(point_data)
-            self.get_logger().info(f'Point {len(self.points)}/{self.max_points} added: '
-                                   f'x={point_data["x"]:.2f}, y={point_data["y"]:.2f}, z={point_data["z"]:.2f}')
+            self.points.append(pointData)
+            self.get_logger().info(f'Point {len(self.points)}/{self.maxPoints} added: '
+                                   f'x={pointData["x"]:.2f}, y={pointData["y"]:.2f}, z={pointData["z"]:.2f}')
             
-            if len(self.points) >= self.max_points:
-                self.save_points()
-                self.get_logger().info(f'Reached maximum points ({self.max_points}). Points saved.')
+            if len(self.points) >= self.maxPoints:
+                self.SavePoints()
+                self.get_logger().info(f'Reached maximum points ({self.maxPoints}). Points saved.')
         else:
-            self.get_logger().warn(f'Maximum number of points ({self.max_points}) already reached.')
+            self.get_logger().warn(f'Maximum number of points ({self.maxPoints}) already reached.')
     
-    def save_points(self):
+    def SavePoints(self):
         data = {'patrol_points': self.points}
         
         try:
-            with open(self.output_file, 'w') as file:
+            with open(self.outputFile, 'w') as file:
                 yaml.dump(data, file, default_flow_style=False)
-            self.get_logger().info(f'Successfully saved {len(self.points)} points to {self.output_file}')
+            if rclpy.ok():
+                self.get_logger().info(
+                    f'Successfully saved {len(self.points)} points to {self.outputFile}'
+                )
         except Exception as e:
-            self.get_logger().error(f'Failed to save points: {str(e)}')
+            if rclpy.ok():
+                self.get_logger().error(f'Failed to save points: {str(e)}')
 
 
-def main(args=None):
+def Main(args=None):
     rclpy.init(args=args)
     node = PatrollingPointGatherer()
     
@@ -72,10 +76,10 @@ def main(args=None):
     finally:
         # Save points on shutdown if any were collected
         if node.points and len(node.points) > 0:
-            node.save_points()
+            node.SavePoints()
         node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 if __name__ == '__main__':
-    main()
+    Main()

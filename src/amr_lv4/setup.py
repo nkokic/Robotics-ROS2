@@ -42,10 +42,10 @@ setup(
     entry_points={
         'console_scripts': [
             'aruco_localization = amr_lv4.aruco_localization_node:main',
-            'gather_points = amr_lv4.gather_points:main',
-            'patrol_points = amr_lv4.patrol_points:main',
-            'collect_marker_poses = amr_lv4.collect_marker_poses:main',
-            'aruco_patrol = amr_lv4.aruco_patrol_node:main',
+            'gather_points = amr_lv4.gather_points:Main',
+            'patrol_points = amr_lv4.patrol_points:Main',
+            'collect_marker_poses = amr_lv4.collect_marker_poses:Main',
+            'aruco_patrol = amr_lv4.aruco_patrol_node:Main',
         ],
 
     },

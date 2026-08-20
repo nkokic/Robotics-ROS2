@@ -15,13 +15,13 @@ class ArucoViewerNode(Node):
 
         # Parameter for image topic
         self.declare_parameter("image_topic", "/oak/rgb/color")
-        image_topic = (
+        imageTopic = (
             self.get_parameter("image_topic")
             .get_parameter_value()
             .string_value
         )
 
-        self.get_logger().info(f"Subscribing image: {image_topic}")
+        self.get_logger().info(f"Subscribing image: {imageTopic}")
 
         self.bridge = CvBridge()
 
@@ -30,10 +30,10 @@ class ArucoViewerNode(Node):
         self.parameters = aruco.DetectorParameters_create()
 
         # Subscriber
-        self.image_sub = self.create_subscription(
-            Image, image_topic, self.image_callback, 1)
+        self.imageSubscription = self.create_subscription(
+            Image, imageTopic, self.ImageCallback, 1)
 
-    def image_callback(self, msg: Image):
+    def ImageCallback(self, msg: Image):
         # Convert ROS -> OpenCV
         try:
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
@@ -65,7 +65,7 @@ class ArucoViewerNode(Node):
         super().destroy_node()
 
 
-def main(args=None):
+def Main(args=None):
     rclpy.init(args=args)
     node = ArucoViewerNode()
     try:
@@ -74,8 +74,8 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        rclpy.Shutdown()
 
 
 if __name__ == "__main__":
-    main()
+    Main()

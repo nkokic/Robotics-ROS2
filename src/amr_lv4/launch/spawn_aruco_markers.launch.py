@@ -9,26 +9,26 @@ from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
 
-def load_markers_from_yaml():
-    pkg_share = get_package_share_directory("amr_lv4")
-    yaml_path = os.path.join(pkg_share, "config", "aruco_markers.yaml")
+def LoadMarkersFromYaml():
+    packageShare = get_package_share_directory("amr_lv4")
+    yamlPath = os.path.join(packageShare, "config", "aruco_markers.yaml")
 
-    if not os.path.exists(yaml_path):
-        raise FileNotFoundError(f"Marker config YAML not found: {yaml_path}")
+    if not os.path.exists(yamlPath):
+        raise FileNotFoundError(f"Marker config YAML not found: {yamlPath}")
 
-    with open(yaml_path, "r") as f:
+    with open(yamlPath, "r") as f:
         data = yaml.safe_load(f) or {}
 
     markers = data.get("markers", [])
     if not markers:
-        print(f"[spawn_aruco_markers] No 'markers' list in {yaml_path}")
-    return markers, pkg_share
+        print(f"[spawn_aruco_markers] No 'markers' list in {yamlPath}")
+    return markers, packageShare
 
 
 def generate_launch_description():
-    markers, pkg_share = load_markers_from_yaml()
+    markers, packageShare = LoadMarkersFromYaml()
 
-    spawn_nodes = []
+    spawnNodes = []
 
     for m in markers:
         mid = m["id"]
@@ -37,19 +37,19 @@ def generate_launch_description():
         z = float(m.get("z", 0.0))
         roll = float(m.get("roll", 0.0))
         pitch = float(m.get("pitch", 0.0))
-        yaw = float(m.get("yaw", 0.0))
+        yaw = float(m.get("yaw", 0.0)) + pi/2
 
-        sdf_path = os.path.join(
-            pkg_share, "models", f"aruco_marker_{mid}", "model.sdf"
+        sdfPath = os.path.join(
+            packageShare, "models", f"aruco_marker_{mid}", "model.sdf"
         )
 
-        if not os.path.exists(sdf_path):
+        if not os.path.exists(sdfPath):
             print(
-                f"[spawn_aruco_markers] WARNING: SDF for marker {mid} not found at {sdf_path}"
+                f"[spawn_aruco_markers] WARNING: SDF for marker {mid} not found at {sdfPath}"
             )
             continue
 
-        spawn_nodes.append(
+        spawnNodes.append(
             Node(
                 package="ros_gz_sim",
                 executable="create",
@@ -57,7 +57,7 @@ def generate_launch_description():
                 output="screen",
                 arguments=[
                     "-file",
-                    sdf_path,
+                    sdfPath,
                     "-name",
                     f"aruco_marker_{mid}",
                     "-allow_renaming",
@@ -78,4 +78,4 @@ def generate_launch_description():
             )
         )
 
-    return LaunchDescription(spawn_nodes)
+    return LaunchDescription(spawnNodes)

@@ -16,12 +16,12 @@ import math
 import yaml
 
 
-def quaternion_to_euler(x, y, z, w):
+def QuaternionToEuler(x, y, z, w):
     """Pretvori quaternion u Euler kuteve (roll, pitch, yaw)."""
     # Roll (x-axis rotation)
-    sinr_cosp = 2 * (w * x + y * z)
-    cosr_cosp = 1 - 2 * (x * x + y * y)
-    roll = math.atan2(sinr_cosp, cosr_cosp)
+    sinRollCosPitch = 2 * (w * x + y * z)
+    cosRollCosPitch = 1 - 2 * (x * x + y * y)
+    roll = math.atan2(sinRollCosPitch, cosRollCosPitch)
 
     # Pitch (y-axis rotation)
     sinp = 2 * (w * y - z * x)
@@ -31,9 +31,9 @@ def quaternion_to_euler(x, y, z, w):
         pitch = math.asin(sinp)
 
     # Yaw (z-axis rotation)
-    siny_cosp = 2 * (w * z + x * y)
-    cosy_cosp = 1 - 2 * (y * y + z * z)
-    yaw = math.atan2(siny_cosp, cosy_cosp)
+    sinYawCosPitch = 2 * (w * z + x * y)
+    cosYawCosPitch = 1 - 2 * (y * y + z * z)
+    yaw = math.atan2(sinYawCosPitch, cosYawCosPitch)
 
     return roll, pitch, yaw
 
@@ -42,39 +42,39 @@ class MarkerPoseCollector(Node):
     def __init__(self):
         super().__init__('marker_pose_collector')
         
-        self.marker_ids = [1, 5, 10, 15, 20]  # ID-jevi markera
-        self.marker_height = 0.35  # Visina markera (visina kamere robota)
+        self.markerIds = [1, 5, 10, 15, 20]  # ID-jevi markera
+        self.markerHeight = 0.35  # Visina markera (visina kamere robota)
         
         self.poses = []
-        self.current_index = 0
-        self.total_markers = 5
+        self.currentIndex = 0
+        self.totalMarkers = 5
         
         # Subscribe na goal_pose topic (2D Nav Goal u RVizu)
         self.subscription = self.create_subscription(
             PoseStamped,
             '/goal_pose',
-            self.goal_callback,
+            self.GoalCallback,
             10
         )
         
         self.get_logger().info('=' * 60)
         self.get_logger().info('ArUco Marker Pose Collector')
         self.get_logger().info('=' * 60)
-        self.get_logger().info(f'Postavi {self.total_markers} pozicija markera koristeci "2D Nav Goal" u RVizu')
-        self.get_logger().info(f'Marker ID-jevi: {self.marker_ids}')
+        self.get_logger().info(f'Postavi {self.totalMarkers} pozicija markera koristeci "2D Nav Goal" u RVizu')
+        self.get_logger().info(f'Marker ID-jevi: {self.markerIds}')
         self.get_logger().info('-' * 60)
-        self.get_logger().info(f'Cekam poziciju za marker ID {self.marker_ids[0]}...')
+        self.get_logger().info(f'Cekam poziciju za marker ID {self.markerIds[0]}...')
 
-    def goal_callback(self, msg: PoseStamped):
-        if self.current_index >= self.total_markers:
+    def GoalCallback(self, msg: PoseStamped):
+        if self.currentIndex >= self.totalMarkers:
             return
         
-        marker_id = self.marker_ids[self.current_index]
+        markerId = self.markerIds[self.currentIndex]
         
         # Izvuci poziciju
         x = msg.pose.position.x
         y = msg.pose.position.y
-        z = self.marker_height  # Koristimo fiksnu visinu
+        z = self.markerHeight  # Koristimo fiksnu visinu
         
         # Izvuci orijentaciju (quaternion -> euler)
         qx = msg.pose.orientation.x
@@ -82,11 +82,11 @@ class MarkerPoseCollector(Node):
         qz = msg.pose.orientation.z
         qw = msg.pose.orientation.w
         
-        _, _, yaw = quaternion_to_euler(qx, qy, qz, qw)
+        roll, pitch, yaw = QuaternionToEuler(qx, qy, qz, qw)
         
         # Za marker na zidu: roll=90° (okomit na pod), yaw prema smjeru strelice
-        marker_data = {
-            'id': marker_id,
+        markerData = {
+            'id': markerId,
             'x': round(x, 3),
             'y': round(y, 3),
             'z': z,
@@ -95,24 +95,24 @@ class MarkerPoseCollector(Node):
             'yaw': round(yaw, 4)
         }
         
-        self.poses.append(marker_data)
-        self.current_index += 1
+        self.poses.append(markerData)
+        self.currentIndex += 1
         
-        self.get_logger().info(f'Marker {marker_id}: x={x:.3f}, y={y:.3f}, yaw={yaw:.4f} rad ({math.degrees(yaw):.1f}°)')
+        self.get_logger().info(f'Marker {markerId}: x={x:.3f}, y={y:.3f}, yaw={yaw:.4f} rad ({math.degrees(yaw):.1f}°)')
         
-        if self.current_index < self.total_markers:
-            next_id = self.marker_ids[self.current_index]
-            self.get_logger().info(f'Cekam poziciju za marker ID {next_id}... ({self.current_index}/{self.total_markers})')
+        if self.currentIndex < self.totalMarkers:
+            nextId = self.markerIds[self.currentIndex]
+            self.get_logger().info(f'Cekam poziciju za marker ID {nextId}... ({self.currentIndex}/{self.totalMarkers})')
         else:
             self.get_logger().info('=' * 60)
             self.get_logger().info('Svi markeri prikupljeni! Generiranje YAML konfiguracije...')
             self.get_logger().info('=' * 60)
-            self.print_yaml_config()
+            self.PrintYamlConfig()
 
-    def print_yaml_config(self):
+    def PrintYamlConfig(self):
         """Ispiši YAML konfiguraciju za aruco_markers.yaml."""
         
-        yaml_data = {'markers': self.poses}
+        yamlData = {'markers': self.poses}
         
         print('\n' + '=' * 60)
         print('YAML KONFIGURACIJA - kopiraj u aruco_markers.yaml:')
@@ -139,16 +139,16 @@ class MarkerPoseCollector(Node):
         print('=' * 60)
         
         # Također spremi u datoteku
-        output_path = '/tmp/aruco_markers_collected.yaml'
-        with open(output_path, 'w') as f:
+        outputPath = '/tmp/aruco_markers_collected.yaml'
+        with open(outputPath, 'w') as f:
             f.write("# ArUco markeri - generirano pomocu collect_marker_poses.py\n")
             f.write("# DICT_4X4_50, velicina 0.2m\n")
-            yaml.dump(yaml_data, f, default_flow_style=False, sort_keys=False)
+            yaml.dump(yamlData, f, default_flow_style=False, sort_keys=False)
         
-        self.get_logger().info(f'Konfiguracija spremljena u: {output_path}')
+        self.get_logger().info(f'Konfiguracija spremljena u: {outputPath}')
 
 
-def main(args=None):
+def Main(args=None):
     rclpy.init(args=args)
     node = MarkerPoseCollector()
     
@@ -158,8 +158,8 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        rclpy.Shutdown()
 
 
 if __name__ == '__main__':
-    main()
+    Main()

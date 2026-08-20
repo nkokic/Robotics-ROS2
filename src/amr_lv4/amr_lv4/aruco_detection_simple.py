@@ -5,9 +5,9 @@ image = cv2.imread("/home/user/amr/amr_lv4_ws/bitmap.jpg")
 
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
+arucoDictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 
-corners, ids, rejected = aruco.detectMarkers(gray, aruco_dict)
+corners, ids, rejected = aruco.detectMarkers(gray, arucoDictionary)
 
 if ids is not None:
     print(f"Detected markers: {len(ids)}")

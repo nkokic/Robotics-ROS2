@@ -6,7 +6,7 @@ import cv2
 from cv2 import aruco
 import numpy as np
 
-SDF_TEMPLATE = """<?xml version="1.0" ?>
+SdfTemplate = """<?xml version="1.0" ?>
 <sdf version="1.7">
   <model name="aruco_marker_{id}">
     <static>true</static>
@@ -45,7 +45,7 @@ SDF_TEMPLATE = """<?xml version="1.0" ?>
 """
 
 
-MODEL_CONFIG_TEMPLATE = """<?xml version="1.0"?>
+ModelConfigTemplate = """<?xml version="1.0"?>
 <model>
   <name>aruco_marker_{id}</name>
   <version>1.0</version>
@@ -59,16 +59,16 @@ MODEL_CONFIG_TEMPLATE = """<?xml version="1.0"?>
 """
 
 
-def generate_marker_image(marker_id: int, side_px: int) -> np.ndarray:
+def GenerateMarkerImage(markerId: int, sidePixels: int) -> np.ndarray:
     dictionary = aruco.Dictionary_get(aruco.DICT_4X4_50)
-    img = np.zeros((side_px, side_px), dtype=np.uint8)
-    aruco.drawMarker(dictionary, marker_id, side_px, img, borderBits=1)
+    img = np.zeros((sidePixels, sidePixels), dtype=np.uint8)
+    aruco.drawMarker(dictionary, markerId, sidePixels, img, borderBits=1)
 
-    img_color = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    return img_color
+    colorImage = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    return colorImage
 
 
-def main():
+def Main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--dirpath",
@@ -98,27 +98,27 @@ def main():
     )
     args = parser.parse_args()
 
-    pkg_path = pathlib.Path(args.dirpath).parent
-    models_dir = pkg_path / "models"
-    models_dir.mkdir(exist_ok=True)
+    packagePath = pathlib.Path(args.dirpath).parent
+    modelsDirectory = packagePath / "models"
+    modelsDirectory.mkdir(exist_ok=True)
 
-    for m_id in args.ids:
-        model_dir = models_dir / f"aruco_marker_{m_id}"
-        textures_dir = model_dir / "materials" / "textures"
-        textures_dir.mkdir(parents=True, exist_ok=True)
+    for markerId in args.ids:
+        modelDirectory = modelsDirectory / f"aruco_marker_{markerId}"
+        texturesDirectory = modelDirectory / "materials" / "textures"
+        texturesDirectory.mkdir(parents=True, exist_ok=True)
 
-        img = generate_marker_image(m_id, args.pixels)
-        png_path = textures_dir / f"aruco_{m_id}.png"
-        cv2.imwrite(str(png_path), img)
+        img = GenerateMarkerImage(markerId, args.pixels)
+        pngPath = texturesDirectory / f"aruco_{markerId}.png"
+        cv2.imwrite(str(pngPath), img)
 
-        sdf_text = SDF_TEMPLATE.format(id=m_id, size=args.size)
-        (model_dir / "model.sdf").write_text(sdf_text)
+        sdfText = SdfTemplate.format(id=markerId, size=args.size)
+        (modelDirectory / "model.sdf").write_text(sdfText)
 
-        cfg_text = MODEL_CONFIG_TEMPLATE.format(id=m_id)
-        (model_dir / "model.config").write_text(cfg_text)
+        configText = ModelConfigTemplate.format(id=markerId)
+        (modelDirectory / "model.config").write_text(configText)
 
-        print(f"Generated model for marker {m_id} at {model_dir}")
+        print(f"Generated model for marker {markerId} at {modelDirectory}")
 
 
 if __name__ == "__main__":
-    main()
+    Main()
