@@ -56,7 +56,7 @@ class ArucoPatrolNode(Node):
         self.arucoDictionary = aruco.Dictionary_get(aruco.DICT_4X4_50)
         self.arucoParameters = aruco.DetectorParameters_create()
         
-        # Camera intrinsics (bit će popunjeno iz camera_info)
+        # Camera intrinsics (from /camera_info topic)
         self.cameraMatrix = None
         self.distortionCoefficients = None
         

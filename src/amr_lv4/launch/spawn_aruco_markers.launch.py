@@ -5,13 +5,16 @@ from math import pi  # if you want to use it somewhere
 import yaml
 
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
 
 
-def LoadMarkersFromYaml():
+def LoadMarkersFromYaml(yamlPath):
     packageShare = get_package_share_directory("amr_lv4")
-    yamlPath = os.path.join(packageShare, "config", "aruco_markers.yaml")
+    yamlPath = os.path.abspath(os.path.expanduser(yamlPath))
 
     if not os.path.exists(yamlPath):
         raise FileNotFoundError(f"Marker config YAML not found: {yamlPath}")
@@ -25,8 +28,9 @@ def LoadMarkersFromYaml():
     return markers, packageShare
 
 
-def generate_launch_description():
-    markers, packageShare = LoadMarkersFromYaml()
+def SpawnMarkers(context):
+    yamlPath = LaunchConfiguration("marker_file").perform(context)
+    markers, packageShare = LoadMarkersFromYaml(yamlPath)
 
     spawnNodes = []
 
@@ -78,4 +82,20 @@ def generate_launch_description():
             )
         )
 
-    return LaunchDescription(spawnNodes)
+    return spawnNodes
+
+
+def generate_launch_description():
+    markerFileArgument = DeclareLaunchArgument(
+        "marker_file",
+        default_value=PathJoinSubstitution([
+            FindPackageShare("amr_lv4"),
+            "config",
+            "aruco_markers.yaml",
+        ]),
+        description="Path to the ArUco marker YAML configuration",
+    )
+    return LaunchDescription([
+        markerFileArgument,
+        OpaqueFunction(function=SpawnMarkers),
+    ])

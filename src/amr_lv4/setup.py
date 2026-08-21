@@ -27,6 +27,7 @@ setup(
 
         (os.path.join('share', package_name, 'config'),
          glob('config/*.yaml')),
+        (os.path.join('share', package_name), ['patrol_points.yaml']),
     ] + model_data,
     install_requires=['setuptools'],
     zip_safe=True,
@@ -45,6 +46,8 @@ setup(
             'gather_points = amr_lv4.gather_points:Main',
             'patrol_points = amr_lv4.patrol_points:Main',
             'collect_marker_poses = amr_lv4.collect_marker_poses:Main',
+            'collect_patrol_and_markers = '
+            'amr_lv4.collect_patrol_and_markers:main',
             'aruco_patrol = amr_lv4.aruco_patrol_node:Main',
         ],
 
