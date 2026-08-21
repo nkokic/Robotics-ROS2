@@ -1,212 +1,497 @@
 #!/usr/bin/env python3
 # zadatak2_mission.py
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import Twist, PoseStamped
-from nav_msgs.msg import Odometry
-from std_msgs.msg import Empty
-import numpy as np
+
 import math
 import time
 
+import numpy as np
+import rclpy
+
+from geometry_msgs.msg import PoseStamped, Twist
+from nav_msgs.msg import Odometry
+from rclpy.node import Node
+from std_msgs.msg import Empty
+
+
 class DroneMissionController(Node):
-    def __init__(self):
-        super().__init__('drone_mission_controller')
+    NODE_NAME: str = "drone_mission_controller"
 
-        # Parametri
-        self.declare_parameter('target_distance', 0.6)
-        self.declare_parameter('search_speed', 0.2)
-        self.target_dist = self.get_parameter('target_distance').value
-        self.valid_ids = [23, 42]
-        
-        # PID gainovi
-        self.kp_lin = 0.3
-        self.kp_ang = 0.5
+    CMD_VEL_TOPIC: str = "/cmd_vel"
+    TAKEOFF_TOPIC: str = "/takeoff"
+    LAND_TOPIC: str = "/land"
+    ARUCO_POSE_TOPIC: str = "/aruco_pose_detected"
+    ODOM_TOPIC: str = "/odom"
 
-        # Publisheri
-        self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.takeoff_pub = self.create_publisher(Empty, '/takeoff', 1)
-        self.land_pub = self.create_publisher(Empty, '/land', 1)
-        
-        # Subscriberi
-        # SLUŠAMO TEMU IZ PRVOG ZADATKA umjesto kamere
-        self.aruco_sub = self.create_subscription(PoseStamped, '/aruco_pose_detected', self.aruco_data_callback, 10)
-        self.odom_sub = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+    VALID_MARKER_IDS: tuple[int, ...] = (23, 42)
 
-        # Varijable
-        self.state = 'INIT'
-        self.start_pose = None
-        self.current_pose = None
-        self.state_start_time = 0.0
-        
-        self.visited_markers = set()
-        self.current_target_marker = None
-        self.marker_pos = None
-        
-        # Logika potvrde
-        self.detection_counter = 0
-        self.required_detections = 5
-        self.last_seen_id = -1
-        self.last_msg_time = 0
+    DEFAULT_TARGET_DISTANCE: float = 0.6
+    DEFAULT_SEARCH_SPEED: float = 1
 
-        self.get_logger().info("Z2: Kontroler čeka podatke od Z1...")
-        self.timer = self.create_timer(0.05, self.control_loop)
+    REQUIRED_DETECTIONS: int = 5
 
-    def odom_callback(self, msg):
-        self.current_pose = msg.pose.pose
-        if self.start_pose is None and self.state == 'INIT':
-            self.start_pose = msg.pose.pose
+    def __init__(self) -> None:
+        super().__init__(self.NODE_NAME)
 
-    def aruco_data_callback(self, msg):
-        """Ova funkcija se poziva kad Zadatak 1 detektira marker."""
+        # Parameters
+        self.declare_parameter(
+            "target_distance",
+            self.DEFAULT_TARGET_DISTANCE
+        )
+
+        self.declare_parameter(
+            "search_speed",
+            self.DEFAULT_SEARCH_SPEED
+        )
+
+        self._targetDistance: float = self.get_parameter(
+            "target_distance"
+        ).value
+
+        self._searchSpeed: float = self.get_parameter(
+            "search_speed"
+        ).value
+
+        # Controller gains
+        self._linearKp: float = 1
+        self._angularKp: float = 1
+
+        # Publishers
+        self._cmdVelPublisher = self.create_publisher(
+            Twist,
+            self.CMD_VEL_TOPIC,
+            10
+        )
+
+        self._takeoffPublisher = self.create_publisher(
+            Empty,
+            self.TAKEOFF_TOPIC,
+            1
+        )
+
+        self._landPublisher = self.create_publisher(
+            Empty,
+            self.LAND_TOPIC,
+            1
+        )
+
+        # Subscribers
+        self._arucoSubscription = self.create_subscription(
+            PoseStamped,
+            self.ARUCO_POSE_TOPIC,
+            self.ArucoDataCallback,
+            10
+        )
+
+        self._odomSubscription = self.create_subscription(
+            Odometry,
+            self.ODOM_TOPIC,
+            self.OdomCallback,
+            10
+        )
+
+        # Mission state
+        self._state: str = "INIT"
+
+        self._startPose = None
+        self._currentPose = None
+
+        self._stateStartTime: float = 0.0
+
+        # Marker tracking
+        self._visitedMarkers: set[int] = set()
+
+        self._currentTargetMarker: int | None = None
+        self._markerPosition: tuple[float, float, float] | None = None
+
+        # Detection confirmation
+        self._detectionCounter: int = 0
+        self._lastSeenId: int = -1
+        self._lastMessageTime: float = 0.0
+
+        self.get_logger().info(
+            "Controller is waiting for pose request..."
+        )
+
+        # 20 Hz control loop
+        self._controlTimer = self.create_timer(
+            0.05,
+            self.ControlLoop
+        )
+
+    def OdomCallback(self, message: Odometry) -> None:
+        """Updates the current drone pose."""
+
+        self._currentPose = message.pose.pose
+
+        if self._startPose is None and self._state == "INIT":
+            self._startPose = message.pose.pose
+
+    def ArucoDataCallback(self, message: PoseStamped) -> None:
+        """Receives marker data produced by aruco detector."""
+
         try:
-            # ID markera smo poslali u frame_id polju stringa
-            marker_id = int(msg.header.frame_id)
+            # Stores the marker ID in header.frame_id.
+            markerId = int(message.header.frame_id)
+
         except ValueError:
             return
 
-        # Filtriranje (već smo posjetili?)
-        if marker_id in self.visited_markers and self.state != 'BACKING_UP':
+        # Ignore markers that have already been completed,
+        # except while backing away from a marker.
+        if (
+            markerId in self._visitedMarkers
+            and self._state != "BACKING_UP"
+        ):
             return
 
-        # Debouncing logika
-        if marker_id == self.last_seen_id:
-            self.detection_counter += 1
+        # Detection debouncing
+        if markerId == self._lastSeenId:
+            self._detectionCounter += 1
+
         else:
-            self.detection_counter = 1
-            self.last_seen_id = marker_id
-        
-        # Spremi poziciju
-        self.marker_pos = (msg.pose.position.x, msg.pose.position.y, msg.pose.position.z)
-        self.last_msg_time = time.time()
+            self._detectionCounter = 1
+            self._lastSeenId = markerId
 
-        # Ako je potvrđen
-        if self.detection_counter >= self.required_detections:
-            self.current_target_marker = marker_id
-            # Održavaj counter visokim da ne resetira
-            self.detection_counter = self.required_detections
+        # Save marker position relative to camera.
+        self._markerPosition = (
+            message.pose.position.x,
+            message.pose.position.y,
+            message.pose.position.z
+        )
 
-    def send_vel(self, x=0.0, y=0.0, z=0.0, yaw=0.0):
-        msg = Twist()
-        msg.linear.x, msg.linear.y, msg.linear.z = float(x), float(y), float(z)
-        msg.angular.z = float(yaw)
-        self.cmd_vel_pub.publish(msg)
+        self._lastMessageTime = time.time()
 
-    def control_loop(self):
-        curr_time = time.time()
-        
-        # 1. POLIJETANJE
-        if self.state == 'INIT':
-            if self.start_pose:
-                self.takeoff_pub.publish(Empty())
-                self.state_start_time = curr_time
-                self.state = 'TAKING_OFF'
-        
-        elif self.state == 'TAKING_OFF':
-            if (curr_time - self.state_start_time) < 8.0:
-                self.send_vel(0, 0, 0.3, 0)
+        # Confirm marker after several consecutive detections.
+        if self._detectionCounter >= self.REQUIRED_DETECTIONS:
+            self._currentTargetMarker = markerId
+
+            # Keep the counter saturated.
+            self._detectionCounter = self.REQUIRED_DETECTIONS
+
+    def SendVelocity(
+        self,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        yaw: float = 0.0
+    ) -> None:
+        """Publishes a velocity command to the drone."""
+
+        velocityMessage = Twist()
+
+        velocityMessage.linear.x = float(x)
+        velocityMessage.linear.y = float(y)
+        velocityMessage.linear.z = float(z)
+
+        velocityMessage.angular.z = float(yaw)
+
+        self._cmdVelPublisher.publish(velocityMessage)
+
+    def ControlLoop(self) -> None:
+        """Main mission state machine."""
+
+        currentTime = time.time()
+
+        # ---------------------------------------------------------
+        # 1. TAKEOFF
+        # ---------------------------------------------------------
+
+        if self._state == "INIT":
+
+            if self._startPose is not None:
+                self._takeoffPublisher.publish(Empty())
+
+                self._stateStartTime = currentTime
+                self._state = "TAKING_OFF"
+
+        elif self._state == "TAKING_OFF":
+
+            if currentTime - self._stateStartTime < 8.0:
+                self.SendVelocity(
+                    x=0.0,
+                    y=0.0,
+                    z=0.3,
+                    yaw=0.0
+                )
+
             else:
-                self.send_vel(0, 0, 0, 0)
-                self.state = 'SEARCHING'
+                self.SendVelocity()
+                self._state = "SEARCHING"
 
-        # 2. TRAŽENJE
-        elif self.state == 'SEARCHING':
-            if all(m in self.visited_markers for m in self.valid_ids):
-                self.get_logger().info("Kraj. Povratak kući.", throttle_duration_sec=2.0)
-                self.state = 'RETURNING'
+        # ---------------------------------------------------------
+        # 2. SEARCHING
+        # ---------------------------------------------------------
+
+        elif self._state == "SEARCHING":
+
+            allMarkersVisited = all(
+                markerId in self._visitedMarkers
+                for markerId in self.VALID_MARKER_IDS
+            )
+
+            if allMarkersVisited:
+                self.get_logger().info(
+                    "Returning to home position.",
+                    throttle_duration_sec=2.0
+                )
+
+                self._state = "RETURNING"
                 return
 
-            # Je li zadnja poruka od Z1 bila nedavno?
-            is_valid = (curr_time - self.last_msg_time < 0.5) and (self.detection_counter >= self.required_detections)
-            
-            if is_valid:
-                self.get_logger().info(f"Vidim ID {self.current_target_marker}! Prilazim.")
-                self.send_vel(0,0,0,0)
-                self.state = 'APPROACHING'
-            else:
-                self.get_logger().info("Tražim...", throttle_duration_sec=2.0)
-                self.send_vel(0, 0, 0, self.get_parameter('search_speed').value)
+            markerRecentlySeen = (
+                currentTime - self._lastMessageTime < 0.5
+            )
 
-        # 3. PRILAZAK
-        elif self.state == 'APPROACHING':
-            if (curr_time - self.last_msg_time) > 2.0:
-                self.get_logger().warn("Izgubio signal od Z1. Stop.")
-                self.send_vel(0,0,0,0)
-                self.state = 'SEARCHING'
+            markerConfirmed = (
+                self._detectionCounter >= self.REQUIRED_DETECTIONS
+            )
+
+            if markerRecentlySeen and markerConfirmed:
+
+                self.get_logger().info(
+                    f"Investigating marker {self._currentTargetMarker}"
+                )
+
+                self.SendVelocity()
+                self._state = "APPROACHING"
+
+            else:
+                self.get_logger().info(
+                    "Scanning...",
+                    throttle_duration_sec=2.0
+                )
+
+                self.SendVelocity(
+                    yaw=self._searchSpeed
+                )
+
+        # ---------------------------------------------------------
+        # 3. APPROACHING MARKER
+        # ---------------------------------------------------------
+
+        elif self._state == "APPROACHING":
+
+            signalLost = (
+                currentTime - self._lastMessageTime > 2.0
+            )
+
+            if signalLost:
+                self.get_logger().warning(
+                    "Lost signal. Standing by."
+                )
+
+                self.SendVelocity()
+                self._state = "SEARCHING"
+
                 return
 
-            # Čitamo koordinate koje nam je poslao Z1
-            x, y, z = self.marker_pos
-            err_dist = z - self.target_dist
-            
-            if err_dist < 0.1:
-                self.get_logger().info(f"ODRADIO MARKER {self.current_target_marker}")
-                self.visited_markers.add(self.current_target_marker)
-                self.send_vel(0,0,0,0)
-                self.state = 'BACKING_UP'
-                self.state_start_time = curr_time
+            if self._markerPosition is None:
                 return
 
-            # Regulacija
-            vx = np.clip(self.kp_lin * err_dist, -0.2, 0.4)
-            vyaw = np.clip(-self.kp_ang * x, -0.4, 0.4)
-            vz = np.clip(-self.kp_lin * y, -0.2, 0.2)
-            self.send_vel(vx, 0, vz, vyaw)
+            markerX, markerY, markerZ = self._markerPosition
 
-        # 4. ODMICANJE
-        elif self.state == 'BACKING_UP':
-            if (curr_time - self.state_start_time) < 2.0:
-                self.send_vel(-0.3, 0, 0, 0)
+            distanceError = (
+                markerZ - self._targetDistance
+            )
+
+            # Marker reached.
+            if distanceError < 0.1:
+
+                self.get_logger().info(
+                    f"Done investigating marker {self._currentTargetMarker}"
+                )
+
+                if self._currentTargetMarker is not None:
+                    self._visitedMarkers.add(
+                        self._currentTargetMarker
+                    )
+
+                self.SendVelocity()
+
+                self._state = "BACKING_UP"
+                self._stateStartTime = currentTime
+
+                return
+
+            # Proportional control
+            forwardVelocity = np.clip(
+                self._linearKp * distanceError,
+                -1.0,
+                1.0
+            )
+
+            yawVelocity = np.clip(
+                -self._angularKp * markerX,
+                -1.0,
+                1.0
+            )
+
+            verticalVelocity = np.clip(
+                -self._linearKp * markerY,
+                -1.0,
+                1.0
+            )
+
+            self.SendVelocity(
+                x=forwardVelocity,
+                y=0.0,
+                z=verticalVelocity,
+                yaw=yawVelocity
+            )
+
+        # ---------------------------------------------------------
+        # 4. BACKING AWAY
+        # ---------------------------------------------------------
+
+        elif self._state == "BACKING_UP":
+
+            if currentTime - self._stateStartTime < 2.0:
+
+                self.SendVelocity(
+                    x=-0.3
+                )
+
             else:
-                self.state = 'SEARCHING'
-                self.detection_counter = 0
+                self.SendVelocity()
 
-        # 5. POVRATAK I SLIJETANJE
-        elif self.state == 'RETURNING':
-            # ... (Logika povratka ista kao prije) ...
-            cx, cy = self.current_pose.position.x, self.current_pose.position.y
-            sx, sy = self.start_pose.position.x, self.start_pose.position.y
-            dist = math.sqrt((sx-cx)**2 + (sy-cy)**2)
-            
-            if dist < 0.4:
-                self.send_vel(0,0,0,0)
-                self.state = 'LANDING'
-                self.state_start_time = curr_time
+                self._state = "SEARCHING"
+
+                self._detectionCounter = 0
+                self._currentTargetMarker = None
+                self._markerPosition = None
+
+        # ---------------------------------------------------------
+        # 5. RETURN HOME
+        # ---------------------------------------------------------
+
+        elif self._state == "RETURNING":
+
+            if (
+                self._currentPose is None
+                or self._startPose is None
+            ):
+                return
+
+            currentX = self._currentPose.position.x
+            currentY = self._currentPose.position.y
+
+            startX = self._startPose.position.x
+            startY = self._startPose.position.y
+
+            deltaX = startX - currentX
+            deltaY = startY - currentY
+
+            distanceToHome = math.sqrt(
+                deltaX ** 2 + deltaY ** 2
+            )
+
+            # Drone reached the starting position.
+            if distanceToHome < 0.4:
+
+                self.SendVelocity()
+
+                self._state = "LANDING"
+                self._stateStartTime = currentTime
+
+                return
+
+            targetYaw = math.atan2(
+                deltaY,
+                deltaX
+            )
+
+            orientation = self._currentPose.orientation
+
+            currentYaw = math.atan2(
+                2.0 * (
+                    orientation.w * orientation.z
+                    + orientation.x * orientation.y
+                ),
+                1.0 - 2.0 * (
+                    orientation.y ** 2
+                    + orientation.z ** 2
+                )
+            )
+
+            yawError = targetYaw - currentYaw
+            yawError = self.NormalizeAngle(yawError)
+
+            # First rotate toward home.
+            if abs(yawError) > 0.3:
+
+                self.SendVelocity(
+                    yaw=0.5 * np.sign(yawError)
+                )
+
+            # Then move forward while correcting orientation.
             else:
-                target_yaw = math.atan2(sy-cy, sx-cx)
-                q = self.current_pose.orientation
-                curr_yaw = math.atan2(2*(q.w*q.z + q.x*q.y), 1-2*(q.y**2 + q.z**2))
-                yaw_err = target_yaw - curr_yaw
-                while yaw_err > math.pi: yaw_err -= 2*math.pi
-                while yaw_err < -math.pi: yaw_err += 2*math.pi
-                
-                if abs(yaw_err) > 0.3:
-                    self.send_vel(0,0,0, 0.5 * np.sign(yaw_err))
-                else:
-                    self.send_vel(0.3,0,0, 0.5 * yaw_err)
 
-        elif self.state == 'LANDING':
-            self.send_vel(0, 0, -0.3, 0)
-            self.land_pub.publish(Empty())
-            if (curr_time - self.state_start_time) > 8.0:
-                self.send_vel(0,0,0,0)
-                self.state = 'FINISHED'
-                self.get_logger().info("Gotovo.")
-        
-        elif self.state == 'FINISHED':
-            pass
+                self.SendVelocity(
+                    x=0.3,
+                    yaw=0.5 * yawError
+                )
 
-def main(args=None):
+        # ---------------------------------------------------------
+        # 6. LANDING
+        # ---------------------------------------------------------
+
+        elif self._state == "LANDING":
+
+            self.SendVelocity(
+                z=-0.3
+            )
+
+            self._landPublisher.publish(
+                Empty()
+            )
+
+            if currentTime - self._stateStartTime > 8.0:
+
+                self.SendVelocity()
+
+                self._state = "FINISHED"
+
+                self.get_logger().info(
+                    "Landed!"
+                )
+
+        # ---------------------------------------------------------
+        # 7. FINISHED
+        # ---------------------------------------------------------
+
+        elif self._state == "FINISHED":
+            self.SendVelocity()
+
+    @staticmethod
+    def NormalizeAngle(angle: float) -> float:
+        """Normalizes an angle into the [-pi, pi] range."""
+
+        while angle > math.pi:
+            angle -= 2.0 * math.pi
+
+        while angle < -math.pi:
+            angle += 2.0 * math.pi
+
+        return angle
+
+
+def Main(args=None) -> None:
     rclpy.init(args=args)
+
     node = DroneMissionController()
+
     try:
         rclpy.spin(node)
+
     except KeyboardInterrupt:
         pass
+
     finally:
         node.destroy_node()
+
         if rclpy.ok():
             rclpy.shutdown()
 
-if __name__ == '__main__':
-    main()
+
+if __name__ == "__main__":
+    Main()

@@ -1,102 +1,198 @@
 #!/usr/bin/env python3
-# zadatak1_detector.py
-import rclpy
-from rclpy.node import Node
-from cv_bridge import CvBridge
-from tf2_ros import TransformBroadcaster
-from geometry_msgs.msg import TransformStamped, PoseStamped
-from sensor_msgs.msg import Image, CameraInfo
+
 import cv2
-from cv2 import aruco
 import numpy as np
+import rclpy
+
+from cv2 import aruco
+from cv_bridge import CvBridge
+from geometry_msgs.msg import PoseStamped, TransformStamped
+from rclpy.node import Node
+from sensor_msgs.msg import CameraInfo, Image
+from tf2_ros import TransformBroadcaster
+
 
 class ArucoDetectorNode(Node):
-    def __init__(self):
-        super().__init__('aruco_detector_node')
+    NODE_NAME: str = "aruco_detector_node"
 
-        self.declare_parameter('marker_size', 0.12)
-        self.marker_size = self.get_parameter('marker_size').value
-        self.valid_ids = [23, 42]
+    IMAGE_TOPIC: str = "/camera/image_raw"
+    CAMERA_INFO_TOPIC: str = "/camera/camera_info"
+    POSE_TOPIC: str = "/aruco_pose_detected"
 
-        # Publisheri
-        self.tf_broadcaster = TransformBroadcaster(self)
-        # Ovdje šaljemo podatke za Zadatak 2
-        self.pose_pub = self.create_publisher(PoseStamped, '/aruco_pose_detected', 10)
+    DEFAULT_MARKER_SIZE: float = 0.12
+    VALID_MARKER_IDS: tuple[int, ...] = (23, 42)
 
-        self.image_sub = self.create_subscription(Image, '/camera/image_raw', self.image_callback, 10)
-        self.cam_info_sub = self.create_subscription(CameraInfo, '/camera/camera_info', self.cam_info_callback, 10)
+    def __init__(self) -> None:
+        super().__init__(self.NODE_NAME)
 
-        # CV Alati
-        self.bridge = CvBridge()
-        self.aruco_dict = aruco.Dictionary_get(aruco.DICT_4X4_50)
-        self.aruco_params = aruco.DetectorParameters_create()
-        self.aruco_params.minMarkerPerimeterRate = 0.03
-        
-        self.camera_matrix = None
-        self.dist_coeffs = None
+        # Parameters
+        self.declare_parameter("marker_size", self.DEFAULT_MARKER_SIZE)
+        self._markerSize: float = self.get_parameter("marker_size").value
 
-        self.get_logger().info("Z1: Detektor pokrenut. Šaljem podatke na /aruco_pose_detected")
+        # ROS publishers / broadcasters
+        self._tfBroadcaster = TransformBroadcaster(self)
 
-    def cam_info_callback(self, msg):
-        if self.camera_matrix is None:
-            self.camera_matrix = np.array(msg.k).reshape((3, 3))
-            self.dist_coeffs = np.array(msg.d)
+        self._posePublisher = self.create_publisher(
+            PoseStamped,
+            self.POSE_TOPIC,
+            10
+        )
 
-    def image_callback(self, msg):
-        if self.camera_matrix is None: return
+        # ROS subscriptions
+        self._imageSubscription = self.create_subscription(
+            Image,
+            self.IMAGE_TOPIC,
+            self.ImageCallback,
+            10
+        )
+
+        self._cameraInfoSubscription = self.create_subscription(
+            CameraInfo,
+            self.CAMERA_INFO_TOPIC,
+            self.CameraInfoCallback,
+            10
+        )
+
+        # OpenCV tools
+        self._bridge = CvBridge()
+        self._arucoDictionary = aruco.Dictionary_get(aruco.DICT_4X4_50)
+        self._arucoParameters = aruco.DetectorParameters_create()
+
+        self._arucoParameters.minMarkerPerimeterRate = 0.03
+
+        # Camera calibration
+        self._cameraMatrix: np.ndarray | None = None
+        self._distortionCoefficients: np.ndarray | None = None
+
+        self.get_logger().info(
+            f"Detection started. Broadcasting to: {self.POSE_TOPIC}"
+        )
+
+    def CameraInfoCallback(self, message: CameraInfo) -> None:
+        """Stores the camera calibration data once it becomes available."""
+
+        if self._cameraMatrix is not None:
+            return
+
+        self._cameraMatrix = np.array(message.k).reshape((3, 3))
+        self._distortionCoefficients = np.array(message.d)
+
+    def ImageCallback(self, message: Image) -> None:
+        """Detects ArUco markers and publishes their positions."""
+
+        if self._cameraMatrix is None:
+            return
 
         try:
-            cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
-        except Exception: return
+            cvImage = self._bridge.imgmsg_to_cv2(message, "bgr8")
+        except Exception as exception:
+            self.get_logger().warning(
+                f"Could not convert ROS image to OpenCV image: {exception}"
+            )
+            return
 
-        gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
-        corners, ids, _ = aruco.detectMarkers(gray, self.aruco_dict, parameters=self.aruco_params)
+        grayImage = cv2.cvtColor(cvImage, cv2.COLOR_BGR2GRAY)
 
-        if ids is not None:
-            rvecs, tvecs, _ = aruco.estimatePoseSingleMarkers(
-                corners, self.marker_size, self.camera_matrix, self.dist_coeffs)
-            
-            for i in range(len(ids)):
-                marker_id = ids[i][0]
-                if marker_id not in self.valid_ids: continue
+        corners, markerIds, _ = aruco.detectMarkers(
+            grayImage,
+            self._arucoDictionary,
+            parameters=self._arucoParameters
+        )
 
-                # 1. TF Broadcast (Zadatak 1 dio A)
-                self.broadcast_tf(marker_id, tvecs[i][0], msg.header)
-                
-                # 2. Slanje podataka na Topic (Zadatak 1 dio B -> za Zadatak 2)
-                self.publish_pose(marker_id, tvecs[i][0], msg.header)
+        if markerIds is None:
+            return
 
-    def broadcast_tf(self, marker_id, tvec, header):
-        t = TransformStamped()
-        t.header = header
-        t.child_frame_id = f"aruco_marker_{marker_id}"
-        t.transform.translation.x, t.transform.translation.y, t.transform.translation.z = tvec
-        t.transform.rotation.w = 1.0
-        self.tf_broadcaster.sendTransform(t)
+        _, translationVectors, _ = aruco.estimatePoseSingleMarkers(
+            corners,
+            self._markerSize,
+            self._cameraMatrix,
+            self._distortionCoefficients
+        )
 
-    def publish_pose(self, marker_id, tvec, header):
-        # Pakiramo podatke u PoseStamped poruku
-        # U header.frame_id (koji je string) ćemo "prošvercati" ID markera
-        # da Zadatak 2 zna koji marker gleda.
-        msg = PoseStamped()
-        msg.header = header
-        msg.header.frame_id = str(marker_id) # <--- OVDJE ŠALJEMO ID
-        msg.pose.position.x = tvec[0]
-        msg.pose.position.y = tvec[1]
-        msg.pose.position.z = tvec[2]
-        self.pose_pub.publish(msg)
+        for index, markerIdArray in enumerate(markerIds):
+            markerId = int(markerIdArray[0])
 
-def main(args=None):
+            if markerId not in self.VALID_MARKER_IDS:
+                continue
+
+            translationVector = translationVectors[index][0]
+
+            self.BroadcastTransform(
+                markerId,
+                translationVector,
+                message.header
+            )
+
+            self.PublishPose(
+                markerId,
+                translationVector,
+                message.header
+            )
+
+    def BroadcastTransform(
+        self,
+        markerId: int,
+        translationVector: np.ndarray,
+        header
+    ) -> None:
+        """Broadcasts the marker position through TF."""
+
+        transform = TransformStamped()
+
+        transform.header = header
+        transform.child_frame_id = f"aruco_marker_{markerId}"
+
+        transform.transform.translation.x = float(translationVector[0])
+        transform.transform.translation.y = float(translationVector[1])
+        transform.transform.translation.z = float(translationVector[2])
+
+        # No marker rotation is currently used.
+        transform.transform.rotation.w = 1.0
+
+        self._tfBroadcaster.sendTransform(transform)
+
+    def PublishPose(
+        self,
+        markerId: int,
+        translationVector: np.ndarray,
+        header
+    ) -> None:
+        """Publishes the detected marker position."""
+
+        poseMessage = PoseStamped()
+
+        poseMessage.header = header
+
+        # Marker ID is stored in frame_id so Zadatak 2 knows
+        # which marker produced this pose.
+        poseMessage.header.frame_id = str(markerId)
+
+        poseMessage.pose.position.x = float(translationVector[0])
+        poseMessage.pose.position.y = float(translationVector[1])
+        poseMessage.pose.position.z = float(translationVector[2])
+
+        poseMessage.pose.orientation.w = 1.0
+
+        self._posePublisher.publish(poseMessage)
+
+
+def Main(args=None) -> None:
     rclpy.init(args=args)
+
     node = ArucoDetectorNode()
+
     try:
         rclpy.spin(node)
+
     except KeyboardInterrupt:
         pass
+
     finally:
         node.destroy_node()
+
         if rclpy.ok():
             rclpy.shutdown()
 
-if __name__ == '__main__':
-    main()
+
+if __name__ == "__main__":
+    Main()

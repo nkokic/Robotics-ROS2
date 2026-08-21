@@ -16,8 +16,8 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='stjepan',
-    maintainer_email='stjepan@todo.todo',
+    maintainer='nikola',
+    maintainer_email='nikola@todo.todo',
     description='TODO: Package description',
     license='TODO: License declaration',
     extras_require={
@@ -27,8 +27,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'detect_aruco = amr_lv5.detect_aruco:main',
-            'drone_controller = amr_lv5.drone_controller:main',
+            'detect_aruco = amr_lv5.detect_aruco:Main',
+            'drone_controller = amr_lv5.drone_controller:Main',
         ],
     },
 )
